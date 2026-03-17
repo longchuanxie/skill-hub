@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60" viewBox="0 0 200 60" fill="none">
+  <!-- 背景圆形 -->
+  <circle cx="30" cy="30" r="25" fill="#000000"/>
+  <!-- 灯泡形状 -->
+  <path d="M30 15C24.4772 15 20 19.4772 20 25C20 27.7614 21.1421 30.2949 23 32L23 40C23 42.7614 25.2386 45 28 45H32C34.7614 45 37 42.7614 37 40V32C38.8579 30.2949 40 27.7614 40 25C40 19.4772 35.5228 15 30 15Z" fill="white"/>
+  <!-- 灯丝 -->
+  <path d="M30 22V30" stroke="#000000" stroke-width="2" stroke-linecap="round"/>
+  <path d="M27 25H33" stroke="#000000" stroke-width="2" stroke-linecap="round"/>
+  <!-- 系统名称 -->
+  <text x="70" y="38" font-family="Inter, sans-serif" font-size="28" font-weight="bold" fill="#000000">SkillHub</text>
+</svg>
