@@ -59,8 +59,7 @@ backend/chrome/
 # Backup files
 *.bak
 
-# Documentation
-docs/
+
 
 # Temporary files
 backend/temp/
