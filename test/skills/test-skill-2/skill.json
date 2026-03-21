@@ -1,0 +1,9 @@
+{
+  "name": "test-skill-2",
+  "version": "1.0.0",
+  "description": "Another test skill for testing version updates and rollback functionality.",
+  "author": "test-user",
+  "license": "MIT",
+  "keywords": ["test", "version", "rollback"],
+  "category": "data-analysis"
+}
