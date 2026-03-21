@@ -2,6 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
 import { promisify } from 'util';
+import { createLogger } from './logger';
+
+const logger = createLogger('skillUploadValidator');
 
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
@@ -23,6 +26,7 @@ export interface ValidationResult {
   errors: string[];
   structure?: SkillManifest;
   format?: 'SKILL.md';
+  topLevelDir?: string;
 }
 
 // 检查目录是否存在
@@ -35,86 +39,72 @@ async function directoryExists(dirPath: string): Promise<boolean> {
   }
 }
 
+// 检查SKILL.md是否存在
+async function checkSkillMdExists(skillDir: string): Promise<{ exists: boolean; fileName: string }> {
+  const possibleNames = ['SKILL.md'];
+  for (const fileName of possibleNames) {
+    const filePath = path.join(skillDir, fileName);
+    try {
+      const stats = await stat(filePath);
+      if (stats.isFile()) {
+        return { exists: true, fileName };
+      }
+    } catch {
+      continue;
+    }
+  }
+  return { exists: false, fileName: '' };
+}
+
 // 读取并解析SKILL.md文件
-async function readSkillMd(skillDir: string): Promise<SkillManifest | null> {
-  const skillMdPath = path.join(skillDir, 'SKILL.md');
+async function readSkillMd(skillDir: string, fileName: string = 'SKILL.md'): Promise<{ manifest: SkillManifest; hasFrontmatter: boolean }> {
+  const skillMdPath = path.join(skillDir, fileName);
   try {
     const content = fs.readFileSync(skillMdPath, 'utf8');
-    
-    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)/s);
-    if (!frontmatterMatch) {
-      return null;
-    }
-    
-    const frontmatter = frontmatterMatch[1];
-    const body = frontmatterMatch[2];
-    
+
     let manifest: SkillManifest = {
       name: '',
       description: '',
     };
-    
-    const lines = frontmatter.split('\n');
-    for (const line of lines) {
-      const match = line.match(/^(\w+):\s*(.*)$/);
-      if (match) {
-        const key = match[1].trim();
-        const value = match[2].trim();
-        
-        if (key === 'name') manifest.name = value;
-        else if (key === 'description') manifest.description = value;
-        else if (key === 'version') manifest.version = value;
-        else if (key === 'category') manifest.category = value;
-        else if (key === 'tags') {
-          manifest.tags = value.split(',').map(tag => tag.trim());
-        }
-        else if (key === 'author') manifest.author = value;
-        else if (key === 'license') manifest.license = value;
-        else if (key === 'compatibility') {
-          manifest.compatibility = value.split(',').map(comp => comp.trim());
+
+    let hasFrontmatter = false;
+
+    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)/s);
+    if (frontmatterMatch) {
+      hasFrontmatter = true;
+      const frontmatter = frontmatterMatch[1];
+
+      const lines = frontmatter.split('\n');
+      for (const line of lines) {
+        const match = line.match(/^(\w+):\s*(.*)$/);
+        if (match) {
+          const key = match[1].trim();
+          const value = match[2].trim();
+
+          if (key === 'name') manifest.name = value;
+          else if (key === 'description') manifest.description = value;
+          else if (key === 'license') manifest.license = value;
         }
       }
     }
-    
-    if (!manifest.name || !manifest.description) {
-      return null;
-    }
-    
-    return manifest;
+
+    return { manifest, hasFrontmatter };
   } catch {
-    return null;
+    return {
+      manifest: {
+        name: '',
+        description: '',
+      },
+      hasFrontmatter: false,
+    };
   }
 }
 
-// 验证SKILL.md结构
+
+
+// 验证SKILL.md结构（简化版，不再要求严格的格式）
 function validateSkillMd(manifest: SkillManifest): string[] {
-  const errors: string[] = [];
-  
-  if (!manifest.name || typeof manifest.name !== 'string' || manifest.name.trim() === '') {
-    errors.push('name is required and must be a non-empty string');
-  }
-  
-  if (!manifest.description || typeof manifest.description !== 'string' || manifest.description.trim() === '') {
-    errors.push('description is required and must be a non-empty string');
-  }
-  
-  if (manifest.description.length < 10) {
-    errors.push('description must be at least 10 characters long');
-  }
-  
-  if (manifest.description.length > 500) {
-    errors.push('description must be less than 500 characters');
-  }
-  
-  if (manifest.tags && !Array.isArray(manifest.tags)) {
-    errors.push('tags must be an array if provided');
-  }
-  
-  if (manifest.compatibility && !Array.isArray(manifest.compatibility)) {
-    errors.push('compatibility must be an array if provided');
-  }
-  
-  return errors;
+  return [];
 }
 
 // 检查是否包含恶意文件
@@ -148,14 +138,21 @@ async function checkFileContentForMaliciousPatterns(skillDir: string): Promise<s
   const textFileExtensions = ['.json', '.js', '.mjs', '.ts', '.py', '.txt', '.md', '.html', '.css'];
   const errors: string[] = [];
   
-  const MALICIOUS_PATTERNS = [
+  // JavaScript/TypeScript的恶意模式
+  const JS_MALICIOUS_PATTERNS = [
     'eval(', 'exec(', 'system(', '__import__',
     '<script>', 'javascript:', 'data:',
     'document.cookie', 'window.location',
     'process.env', 'require(',
     'child_process', 'execSync', 'spawn',
     'fs.unlink', 'fs.rmdir', 'fs.rm',
-    'os.exec', 'subprocess', 'popen'
+    'os.exec', 'popen'
+  ];
+  
+  // Python的真正恶意模式（只检测eval、exec等危险的动态执行）
+  const PYTHON_MALICIOUS_PATTERNS = [
+    'eval(',
+    'exec('
   ];
   
   const AI_JAILBREAK_PATTERNS = [
@@ -206,9 +203,23 @@ async function checkFileContentForMaliciousPatterns(skillDir: string): Promise<s
                   errors.push(`File ${file} contains AI jailbreak pattern: ${pattern}`);
                 }
               }
+            } else if (ext === '.py') {
+              // 对于Python文件，只检测真正危险的动态执行
+              for (const pattern of PYTHON_MALICIOUS_PATTERNS) {
+                if (contentLower.includes(pattern.toLowerCase())) {
+                  errors.push(`File ${file} contains potentially malicious pattern: ${pattern}`);
+                }
+              }
+              
+              // 检查AI越狱模式
+              for (const pattern of AI_JAILBREAK_PATTERNS) {
+                if (contentLower.includes(pattern.toLowerCase())) {
+                  errors.push(`File ${file} contains AI jailbreak pattern: ${pattern}`);
+                }
+              }
             } else {
-              // 对于非JavaScript文件，使用常规检测
-              for (const pattern of MALICIOUS_PATTERNS) {
+              // 对于其他文本文件，使用常规检测
+              for (const pattern of JS_MALICIOUS_PATTERNS) {
                 if (contentLower.includes(pattern.toLowerCase())) {
                   errors.push(`File ${file} contains potentially malicious pattern: ${pattern}`);
                 }
@@ -332,59 +343,110 @@ export async function validateSkillUpload(zipPath: string, tempDir: string): Pro
   const errors: string[] = [];
   
   try {
+    logger.debug('Starting skill upload validation', { zipPath, tempDir });
+    
     // 解压ZIP文件
     await extractZip(zipPath, tempDir);
+    logger.debug('ZIP file extracted successfully', { tempDir });
     
     // 检查解压后的目录结构
     const files = await readdir(tempDir);
     if (files.length === 0) {
+      logger.warn('Validation failed - ZIP file is empty', { tempDir });
       errors.push('ZIP file is empty');
       return { valid: false, errors, format: 'SKILL.md' };
     }
     
-    // 找到Skill目录（假设ZIP包中只有一个目录）
-    let skillDir = tempDir;
+    // 获取顶级目录名（如果只有一个顶级目录）
+    let topLevelDir: string | undefined;
     if (files.length === 1) {
-      const firstItem = path.join(tempDir, files[0]);
-      const stats = await stat(firstItem);
-      if (stats.isDirectory()) {
-        skillDir = firstItem;
+      const firstItemPath = path.join(tempDir, files[0]);
+      const firstItemStats = await stat(firstItemPath);
+      if (firstItemStats.isDirectory()) {
+        topLevelDir = files[0];
+        logger.debug('Found single top-level directory', { topLevelDir });
       }
     }
     
-    // 检查SKILL.md文件
-    const skillMd = await readSkillMd(skillDir);
-    if (!skillMd) {
-      errors.push('SKILL.md file not found');
+    // 直接在根目录检查SKILL.md
+    const skillDir = tempDir;
+    
+    // 检查SKILL.md文件是否存在于根目录
+    const skillMdCheck = await checkSkillMdExists(skillDir);
+    if (!skillMdCheck.exists) {
+      logger.warn('Validation failed - SKILL.md not found in root directory', { tempDir, files: files.join(', ') });
+      errors.push('SKILL.md file must be in the root directory of the ZIP file');
       return { valid: false, errors, format: 'SKILL.md' };
     }
     
-    // 验证SKILL.md结构
-    const mdErrors = validateSkillMd(skillMd);
-    errors.push(...mdErrors);
-    
+    // 读取SKILL.md
+    const { manifest: skillMdManifest, hasFrontmatter } = await readSkillMd(skillDir, skillMdCheck.fileName);
+
+    // SKILL.md必须有frontmatter元数据
+    if (!hasFrontmatter) {
+      logger.warn('Validation failed - SKILL.md must contain YAML frontmatter metadata');
+      errors.push('SKILL.md must contain YAML frontmatter metadata with "name" and "description" fields. Example:\n\n---\nname: your-skill-name\ndescription: Your skill description\nlicense: MIT\n---');
+      return { valid: false, errors, format: 'SKILL.md' };
+    }
+
+    // 验证必填字段
+    if (!skillMdManifest.name || !skillMdManifest.description) {
+      logger.warn('Validation failed - missing required fields in frontmatter', { 
+        hasName: !!skillMdManifest.name, 
+        hasDescription: !!skillMdManifest.description 
+      });
+      const missingFields = [];
+      if (!skillMdManifest.name) missingFields.push('name');
+      if (!skillMdManifest.description) missingFields.push('description');
+      errors.push(`SKILL.md frontmatter is missing required fields: ${missingFields.join(', ')}`);
+      return { valid: false, errors, format: 'SKILL.md' };
+    }
+
+    const finalManifest = skillMdManifest;
+    logger.debug('SKILL.md parsed successfully', { name: finalManifest.name, version: finalManifest.version });
+
     // 检查是否包含恶意文件
     const maliciousErrors = await checkForMaliciousFiles(skillDir);
+    if (maliciousErrors.length > 0) {
+      logger.warn('Malicious files detected', { count: maliciousErrors.length, errors: maliciousErrors });
+    }
     errors.push(...maliciousErrors);
     
     // 检查文件内容中的恶意模式
     const contentMaliciousErrors = await checkFileContentForMaliciousPatterns(skillDir);
+    if (contentMaliciousErrors.length > 0) {
+      logger.warn('Malicious patterns detected in file content', { count: contentMaliciousErrors.length, errors: contentMaliciousErrors });
+    }
     errors.push(...contentMaliciousErrors);
     
     // 检查文件大小限制
     const sizeErrors = await checkFileSizeLimits(skillDir);
+    if (sizeErrors.length > 0) {
+      logger.warn('File size limit violations', { count: sizeErrors.length, errors: sizeErrors });
+    }
     errors.push(...sizeErrors);
     
     // 检查敏感信息泄露
     const sensitiveInfoErrors = await checkForSensitiveInfo(skillDir);
+    if (sensitiveInfoErrors.length > 0) {
+      logger.warn('Sensitive information detected', { count: sensitiveInfoErrors.length, errors: sensitiveInfoErrors });
+    }
     errors.push(...sensitiveInfoErrors);
     
     if (errors.length === 0) {
-      return { valid: true, errors: [], structure: skillMd, format: 'SKILL.md' };
+      logger.info('Skill validation passed successfully', { name: finalManifest?.name || '', version: finalManifest?.version, topLevelDir });
+      return { valid: true, errors: [], structure: finalManifest, format: 'SKILL.md', topLevelDir };
     } else {
+      logger.warn('Skill validation failed', { totalErrors: errors.length, errors });
       return { valid: false, errors, format: 'SKILL.md' };
     }
   } catch (error) {
+    logger.error('Skill validation error', { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      zipPath,
+      tempDir
+    });
     return { valid: false, errors: [error instanceof Error ? error.message : 'Failed to validate skill upload'], format: 'SKILL.md' };
   }
 }
