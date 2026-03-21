@@ -66,14 +66,16 @@ interface IEnterprise extends Document {
   tags?: string[];        // 可选，标签数组
   version?: string;       // 可选，版本号，默认'1.0.0'
   file?: File;            // 可选，ZIP文件
+  updateDescription?: string;  // 可选，版本更新说明
 }
 ```
 
-**响应**：
+**响应**（新建资源）：
 ```typescript
 {
   message: string;
   skill: Skill;
+  isNew: true;  // 新增字段，标识是否为新资源
   visibility: 'enterprise' | 'public';
   status: 'approved' | 'pending';
   autoReviewResult?: {
@@ -84,8 +86,20 @@ interface IEnterprise extends Document {
 }
 ```
 
+**响应**（同名资源版本更新）：
+```typescript
+{
+  message: string;          // "Skill version updated successfully"
+  skill: Skill;             // 更新后的技能对象
+  isNew: false;             // 新增字段，标识是否为新资源
+  previousVersion: string;  // 新增字段，例如 "1.0.0"
+  currentVersion: string;    // 新增字段，例如 "1.0.1"
+}
+```
+
 **状态码**：
-- 201: 创建成功
+- 201: 创建成功（新资源）
+- 200: 版本更新成功（同名资源）
 - 400: 请求参数错误
 - 403: 权限不足
 - 500: 服务器错误
@@ -111,14 +125,16 @@ interface IEnterprise extends Document {
   category?: string;      // 可选，分类，默认'general'
   tags?: string[];        // 可选，标签数组
   version?: string;       // 可选，版本号，默认'1.0.0'
+  updateDescription?: string;  // 可选，版本更新说明
 }
 ```
 
-**响应**：
+**响应**（新建资源）：
 ```typescript
 {
   message: string;
   prompt: Prompt;
+  isNew: true;  // 新增字段，标识是否为新资源
   visibility: 'enterprise' | 'public';
   status: 'approved' | 'pending';
   autoReviewResult?: {
@@ -129,8 +145,20 @@ interface IEnterprise extends Document {
 }
 ```
 
+**响应**（同名资源版本更新）：
+```typescript
+{
+  message: string;              // "Prompt version updated successfully"
+  prompt: Prompt;               // 更新后的提示词对象
+  isNew: false;                  // 新增字段，标识是否为新资源
+  previousVersion: string;       // 新增字段，例如 "1.0.0"
+  currentVersion: string;         // 新增字段，例如 "1.0.1"
+}
+```
+
 **状态码**：
-- 201: 创建成功
+- 201: 创建成功（新资源）
+- 200: 版本更新成功（同名资源）
 - 400: 请求参数错误
 - 403: 权限不足
 - 500: 服务器错误
@@ -398,3 +426,66 @@ else {
 3. **审核日志**：记录审核过程和结果，便于追溯
 4. **人工审核界面**：为管理员提供人工审核界面
 5. **审核统计**：统计审核通过率、常见问题等
+
+## 6. 新增接口：资源更新检查
+
+### 6.1 GET /api/agent/check-update
+
+**功能**：检查是否有同名资源的新版本
+
+**认证**：需要 Agent API Key 认证
+
+**权限**：检查 Agent 的 canRead 权限
+
+**请求参数**（Query）：
+```typescript
+{
+  resourceType: 'skill' | 'prompt';  // 必填，资源类型
+  name: string;                       // 必填，资源名称
+  version: string;                   // 必填，当前版本号
+}
+```
+
+**响应**（有更新）：
+```typescript
+{
+  hasUpdate: true;
+  latestVersion: string;        // 最新版本号
+  currentVersion: string;       // 传入的版本号
+  updateAvailable: true;
+  changelog?: string;           // 更新说明（如果有）
+}
+```
+
+**响应**（无更新）：
+```typescript
+{
+  hasUpdate: false;
+  latestVersion: string;        // 当前最新版本号
+  currentVersion: string;       // 传入的版本号
+  updateAvailable: false;
+}
+```
+
+**响应**（资源不存在）：
+```typescript
+{
+  hasUpdate: false;
+  updateAvailable: false;
+  error: 'RESOURCE_NOT_FOUND';
+  message: 'No resource found with the given name';
+}
+```
+
+**状态码**：
+- 200: 成功
+- 400: 参数错误（缺少必填参数或无效的资源类型）
+- 403: 权限不足
+- 404: 资源不存在
+
+**查询逻辑**：
+1. 根据 resourceType 选择 Skill 或 Prompt 模型
+2. 根据 Agent 是否属于企业，筛选 visibility=enterprise 或 visibility=public 的资源
+3. 使用 name 字段精确匹配查找资源
+4. 查找该资源关联的最新版本记录（SkillVersion 或 PromptVersion）
+5. 比较传入的 version 与最新版本，判断是否有更新
