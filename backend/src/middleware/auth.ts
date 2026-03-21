@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, TokenPayload } from '../utils/jwt';
 import { User } from '../models/User';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('authMiddleware');
 
 export interface AuthRequest extends Request {
   user?: TokenPayload;
@@ -14,6 +17,7 @@ export const authenticate = async (
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logger.warn('Authentication failed - no token provided', { path: req.path, method: req.method, ip: req.ip });
       res.status(401).json({ error: 'No token provided' });
       return;
     }
@@ -23,13 +27,16 @@ export const authenticate = async (
     
     const user = await User.findById(payload.userId);
     if (!user) {
+      logger.warn('Authentication failed - user not found', { userId: payload.userId, path: req.path, method: req.method });
       res.status(401).json({ error: 'User not found' });
       return;
     }
 
     req.user = payload;
+    logger.debug('User authenticated successfully', { userId: payload.userId, path: req.path, method: req.method });
     next();
   } catch (error) {
+    logger.warn('Authentication failed - invalid token', { error: error instanceof Error ? error.message : String(error), path: req.path, method: req.method, ip: req.ip });
     res.status(401).json({ error: 'Invalid token' });
   }
 };

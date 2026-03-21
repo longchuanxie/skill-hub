@@ -31,6 +31,19 @@ export interface Skill {
   updatedAt: string;
 }
 
+export interface SkillVersion {
+  _id: string;
+  skillId: string;
+  version: string;
+  url: string;
+  filename: string;
+  originalName: string;
+  size: number;
+  mimetype: string;
+  updateDescription: string;
+  createdAt: string;
+}
+
 export interface Prompt {
   _id: string;
   name: string;
@@ -133,6 +146,23 @@ export const skillApi = {
     return response.data;
   },
 
+  deleteSkill: async (id: string): Promise<{ message: string }> => {
+    const response = await marketClient.delete<{ message: string }>(`/skills/${id}`);
+    return response.data;
+  },
+
+  getFileTree: async (id: string) => {
+    const response = await marketClient.get(`/skills/${id}/file-tree`);
+    return response.data;
+  },
+
+  previewFile: async (id: string, filePath: string) => {
+    const response = await marketClient.get(`/skills/${id}/preview`, {
+      params: { path: filePath }
+    });
+    return response.data;
+  },
+
   download: async (id: string): Promise<Blob> => {
     const response = await marketClient.get(`/skills/${id}/download`, {
       responseType: 'blob',
@@ -155,27 +185,41 @@ export const skillApi = {
   },
 
   createSkill: async (data: {
-    name: string;
-    description: string;
-    version: string;
+    name?: string;
+    description?: string;
+    updateDescription?: string;
     category: string;
     visibility: string;
     status: string;
-    content: string;
     tags: string[];
+    author?: string;
+    compatibility?: string[];
     file?: File;
   }): Promise<Skill> => {
     const formData = new FormData();
-    formData.append('name', data.name);
-    formData.append('description', data.description);
-    formData.append('version', data.version);
+    if (data.name) {
+      formData.append('name', data.name);
+    }
+    if (data.description) {
+      formData.append('description', data.description);
+    }
+    if (data.updateDescription) {
+      formData.append('updateDescription', data.updateDescription);
+    }
     formData.append('category', data.category);
     formData.append('visibility', data.visibility);
     formData.append('status', data.status);
-    formData.append('content', data.content);
     data.tags.forEach((tag, index) => {
       formData.append(`tags[${index}]`, tag);
     });
+    if (data.author) {
+      formData.append('author', data.author);
+    }
+    if (data.compatibility) {
+      data.compatibility.forEach((c, index) => {
+        formData.append(`compatibility[${index}]`, c);
+      });
+    }
     if (data.file) {
       formData.append('file', data.file);
     }
@@ -185,6 +229,72 @@ export const skillApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+
+  updateSkill: async (id: string, data: {
+    name?: string;
+    description?: string;
+    updateDescription?: string;
+    category: string;
+    visibility: string;
+    status: string;
+    tags: string[];
+    author?: string;
+    compatibility?: string[];
+    file?: File;
+  }): Promise<Skill> => {
+    const formData = new FormData();
+    if (data.name) {
+      formData.append('name', data.name);
+    }
+    if (data.description) {
+      formData.append('description', data.description);
+    }
+    if (data.updateDescription) {
+      formData.append('updateDescription', data.updateDescription);
+    }
+    formData.append('category', data.category);
+    formData.append('visibility', data.visibility);
+    formData.append('status', data.status);
+    data.tags.forEach((tag, index) => {
+      formData.append(`tags[${index}]`, tag);
+    });
+    if (data.author) {
+      formData.append('author', data.author);
+    }
+    if (data.compatibility) {
+      data.compatibility.forEach((c, index) => {
+        formData.append(`compatibility[${index}]`, c);
+      });
+    }
+    if (data.file) {
+      formData.append('file', data.file);
+    }
+
+    const response = await marketClient.put<Skill>(`/skills/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  getSkillVersions: async (skillId: string, params?: {
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ versions: SkillVersion[]; pagination: any }> => {
+    const response = await marketClient.get(`/skills/${skillId}/versions`, { params });
+    return response.data;
+  },
+
+  getSkillVersion: async (skillId: string, versionId: string): Promise<SkillVersion> => {
+    const response = await marketClient.get(`/skills/${skillId}/versions/${versionId}`);
+    return response.data;
+  },
+
+  deleteSkillVersion: async (skillId: string, versionId: string): Promise<{ message: string }> => {
+    const response = await marketClient.delete(`/skills/${skillId}/versions/${versionId}`);
     return response.data;
   },
 };
@@ -234,6 +344,7 @@ export const promptApi = {
     status: string;
     content: string;
     tags: string[];
+    updateDescription?: string;
   }): Promise<Prompt> => {
     const response = await marketClient.post<Prompt>('/prompts', data);
     return response.data;

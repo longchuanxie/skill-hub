@@ -6,6 +6,7 @@ import { SkillVersion } from '../models/SkillVersion';
 import { PromptVersion } from '../models/PromptVersion';
 import { ResourceVersion } from '../models/ResourceVersion';
 import { skillFileUpload } from '../middleware/upload';
+import { downloadSkill } from '../controllers/SkillController';
 import {
   determineResourceStatus,
   incrementVersion,
@@ -84,6 +85,45 @@ router.get('/prompts', async (req: AgentRequest, res: Response) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get prompts' });
+  }
+});
+
+router.get('/skills/:id/download', async (req: AgentRequest, res: Response) => {
+  try {
+    if (!req.agent.permissions.canRead) {
+      res.status(403).json({ error: 'Read permission denied' });
+      return;
+    }
+
+    const skill = await Skill.findById(req.params.id);
+    if (!skill) {
+      res.status(404).json({ error: 'SKILL_NOT_FOUND', message: 'Skill not found' });
+      return;
+    }
+
+    const hasAccess =
+      skill.visibility === 'public' ||
+      String(skill.owner) === String(req.agent.owner) ||
+      (req.agent.enterpriseId && String(skill.enterpriseId) === String(req.agent.enterpriseId));
+
+    if (!hasAccess) {
+      res.status(403).json({ error: 'ACCESS_DENIED', message: 'Access denied' });
+      return;
+    }
+
+    const latestVersion = await SkillVersion.findOne({ skillId: skill._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!latestVersion?.url) {
+      res.status(404).json({ error: 'FILE_NOT_FOUND', message: 'Skill file not found' });
+      return;
+    }
+
+    res.download(latestVersion.url, `${skill.name}.zip`);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'DOWNLOAD_FAILED', message: 'Failed to download skill' });
   }
 });
 

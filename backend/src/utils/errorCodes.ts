@@ -51,6 +51,11 @@ export enum ErrorCode {
   DOWNLOAD_FAILED = 7003,
   SKILL_NOT_FOUND = 7004,
   PUBLIC_SKILL_REQUIRES_FILE = 7005,
+  SKILL_NAME_EXISTS = 7006,
+  SKILL_NAME_EXISTS_BY_OTHER = 7007,
+  NAME_REQUIRED = 7008,
+  INVALID_FILE_TYPE = 7009,
+  INVALID_SKILL_STRUCTURE = 7010,
 }
 
 interface ErrorMessages {
@@ -238,6 +243,26 @@ export const errorMessages: Record<ErrorCode, ErrorMessages> = {
   [ErrorCode.PUBLIC_SKILL_REQUIRES_FILE]: {
     zh: '公开技能必须上传文件',
     en: 'Public skill requires a file upload',
+  },
+  [ErrorCode.SKILL_NAME_EXISTS]: {
+    zh: '您已上传过同名技能，新版本已自动创建',
+    en: 'Skill with this name already exists, new version created automatically',
+  },
+  [ErrorCode.SKILL_NAME_EXISTS_BY_OTHER]: {
+    zh: '同名技能已被其他用户使用',
+    en: 'Skill name already taken by another user',
+  },
+  [ErrorCode.NAME_REQUIRED]: {
+    zh: '技能名称不能为空',
+    en: 'Skill name is required',
+  },
+  [ErrorCode.INVALID_FILE_TYPE]: {
+    zh: '文件类型无效，只支持 ZIP 文件',
+    en: 'Invalid file type, only ZIP files are allowed',
+  },
+  [ErrorCode.INVALID_SKILL_STRUCTURE]: {
+    zh: '技能结构无效',
+    en: 'Invalid skill structure',
   },
 };
 

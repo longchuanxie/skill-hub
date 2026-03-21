@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('contentSecurity');
 
 const DANGEROUS_PATTERNS = [
   /ignore\s+(previous|all|above)\s+(instructions?|rules?|constraints?)/i,
@@ -44,9 +47,17 @@ export const contentSecurityCheck = (
   const { name, description, content } = req.body;
   const allContent = [name, description, content].filter(Boolean).join(' ');
   
+  logger.debug('Content security check', { hasName: !!name, hasDescription: !!description, hasContent: !!content, userId: req.user?.userId });
+  
   const result = checkContent(allContent);
   
   if (!result.safe) {
+    logger.warn('Content security check failed - dangerous patterns detected', { 
+      issues: result.issues, 
+      userId: req.user?.userId, 
+      ip: req.ip,
+      path: req.path 
+    });
     res.status(400).json({
       error: 'Content contains potentially unsafe patterns',
       issues: result.issues,

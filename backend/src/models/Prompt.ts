@@ -16,19 +16,6 @@ export interface IPrompt extends Document {
   category: string;
   tags: string[];
   version: string;
-  versions: {
-    version: string;
-    content: string;
-    description: string;
-    variables: {
-      name: string;
-      type: string;
-      required: boolean;
-      defaultValue?: string;
-      description?: string;
-    }[];
-    createdAt: Date;
-  }[];
   status: 'draft' | 'pending' | 'approved' | 'rejected';
   visibility: 'public' | 'private' | 'enterprise' | 'shared';
   usageCount: number;
@@ -92,19 +79,6 @@ const promptSchema = new Schema<IPrompt>({
     type: String,
     default: '1.0.0',
   },
-  versions: [{
-    version: String,
-    content: String,
-    description: String,
-    variables: [{
-      name: { type: String, required: true },
-      type: { type: String, default: 'string' },
-      required: { type: Boolean, default: false },
-      defaultValue: String,
-      description: String,
-    }],
-    createdAt: { type: Date, default: Date.now },
-  }],
   status: {
     type: String,
     enum: ['draft', 'pending', 'approved', 'rejected'],
@@ -154,6 +128,10 @@ promptSchema.index({ owner: 1 });
 promptSchema.index({ enterpriseId: 1 });
 promptSchema.index({ visibility: 1 });
 promptSchema.index({ status: 1 });
+promptSchema.index(
+  { owner: 1, name: 1 },
+  { unique: true }
+);
 
 promptSchema.methods.calcAverageRating = function() {
   if (this.ratings.length === 0) {

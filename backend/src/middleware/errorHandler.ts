@@ -32,6 +32,9 @@ export const errorHandler = (
     statusCode,
     path: req.path,
     method: req.method,
+    ip: req.ip,
+    isOperational: err.isOperational,
+    code: err.code,
   });
 
   const errorResponse: any = {
