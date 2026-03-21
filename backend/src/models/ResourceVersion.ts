@@ -13,6 +13,7 @@ export interface IResourceVersion extends Document {
     mimetype: string;
   }>;
   changelog: string;
+  tags: string[];
   isActive: boolean;
   createdBy: Schema.Types.ObjectId;
   createdAt: Date;
@@ -51,6 +52,10 @@ const resourceVersionSchema = new Schema<IResourceVersion>({
     type: String,
     maxlength: 2000,
   },
+  tags: [{
+    type: String,
+    trim: true,
+  }],
   isActive: {
     type: Boolean,
     default: true,
