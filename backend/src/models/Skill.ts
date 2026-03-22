@@ -1,12 +1,14 @@
 import { Schema, Document, model } from 'mongoose';
 
 export interface ISkill extends Document {
-  name: string;
-  description: string;
+  name?: string;
+  description?: string;
   owner: Schema.Types.ObjectId;
   enterpriseId?: Schema.Types.ObjectId;
   category: string;
   tags: string[];
+  author?: string;
+  compatibility: string[];
   files: {
     filename: string;
     originalName: string;
@@ -15,11 +17,6 @@ export interface ISkill extends Document {
     mimetype: string;
   }[];
   version: string;
-  versions: Array<{
-    version: string;
-    url: string;
-    createdAt: Date;
-  }>;
   status: 'draft' | 'pending' | 'approved' | 'rejected';
   visibility: 'public' | 'private' | 'enterprise' | 'shared';
   downloads: number;
@@ -41,13 +38,13 @@ export interface ISkill extends Document {
 const skillSchema = new Schema<ISkill>({
   name: {
     type: String,
-    required: true,
+    required: false,
     trim: true,
     maxlength: 100,
   },
   description: {
     type: String,
-    required: true,
+    required: false,
     maxlength: 5000,
   },
   owner: {
@@ -68,6 +65,15 @@ const skillSchema = new Schema<ISkill>({
     type: String,
     trim: true,
   }],
+  author: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+  },
+  compatibility: [{
+    type: String,
+    trim: true,
+  }],
   files: [{
     filename: String,
     path: String,
@@ -78,11 +84,6 @@ const skillSchema = new Schema<ISkill>({
     type: String,
     default: '1.0.0',
   },
-  versions: [{
-    version: String,
-    url: String,
-    createdAt: { type: Date, default: Date.now },
-  }],
   status: {
     type: String,
     enum: ['draft', 'pending', 'approved', 'rejected'],
@@ -130,12 +131,26 @@ const skillSchema = new Schema<ISkill>({
   timestamps: true,
 });
 
-skillSchema.index({ name: 'text', description: 'text', tags: 'text' });
+skillSchema.index(
+  { name: 'text', tags: 'text', description: 'text' },
+  {
+    weights: {
+      name: 10,
+      tags: 5,
+      description: 2
+    },
+    name: 'skill_text_search_index'
+  }
+);
 skillSchema.index({ category: 1 });
 skillSchema.index({ owner: 1 });
 skillSchema.index({ enterpriseId: 1 });
 skillSchema.index({ visibility: 1 });
 skillSchema.index({ status: 1 });
+skillSchema.index(
+  { owner: 1, name: 1 },
+  { unique: true, partialFilterExpression: { name: { $exists: true, $ne: '' } } }
+);
 
 skillSchema.methods.calcAverageRating = function() {
   if (this.ratings.length === 0) {

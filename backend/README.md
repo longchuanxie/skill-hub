@@ -335,6 +335,61 @@ file: skill.zip
 2. 恢复目标版本的内容
 3. 生成新的版本号（如 `1.0.0-restored`）
 
+## mongoDB 索引启动命令
+"D:\workplace\idea\skill-hub\mongodb-win32-x86_64-windows-7.0.14\bin\mongod.exe" --port 27017 --dbpath "D:\workplace\idea\skill-hub\data"
+
+## 数据库索引要求
+
+### 必需索引
+
+上线前需要确保以下索引已创建：
+
+#### Skill 模型索引
+
+```javascript
+// 同一用户不能创建同名技能（复合唯一索引）
+db.skills.createIndex(
+  { owner: 1, name: 1 },
+  { unique: true, partialFilterExpression: { name: { $exists: true, $ne: '' } } }
+)
+```
+
+#### Prompt 模型索引
+
+```javascript
+// 同一用户不能创建同名提示词（复合唯一索引）
+db.prompts.createIndex(
+  { owner: 1, name: 1 },
+  { unique: true }
+)
+```
+
+### 数据清理
+
+创建唯一索引前，需先清理重复数据：
+
+```javascript
+// 查找 Skill 重复数据
+db.skills.aggregate([
+  { $match: { name: { $exists: true, $ne: '' } } },
+  { $group: { _id: { owner: "$owner", name: "$name" }, count: { $sum: 1 }, docs: { $push: "$_id" } } },
+  { $match: { count: { $gt: 1 } } }
+])
+
+// 查找 Prompt 重复数据
+db.prompts.aggregate([
+  { $group: { _id: { owner: "$owner", name: "$name" }, count: { $sum: 1 }, docs: { $push: "$_id" } } },
+  { $match: { count: { $gt: 1 } } }
+])
+```
+
+### 同名资源版本管理
+
+当同一用户上传同名资源时，系统会自动：
+1. 检测 `owner + name` 组合是否已存在
+2. 如存在，自动创建新版本而非新建记录
+3. 版本号自动递增（如 1.0.0 → 1.0.1）
+
 ## 许可证
 
 MIT License

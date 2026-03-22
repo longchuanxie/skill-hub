@@ -1,33 +1,103 @@
 import { Response } from 'express';
 import { Skill } from '../models/Skill';
+import { SkillVersion } from '../models/SkillVersion';
+import { ResourceVersion } from '../models/ResourceVersion';
 import { AuthRequest } from '../middleware/auth';
 import path from 'path';
 import fs from 'fs';
 import { validateSkillUpload } from '../utils/skillUploadValidator';
+import { reviewSkill } from '../utils/resourceAutoReview';
+import { createLogger } from '../utils/logger';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { Types } from 'mongoose';
+
+const logger = createLogger('SkillController');
+
+export async function generateNextVersion(skillId: Types.ObjectId): Promise<string> {
+  const versions = await SkillVersion.find({ skillId }).sort({ createdAt: -1 });
+  
+  if (versions.length === 0) {
+    return '1.0.0';
+  }
+  
+  const lastVersion = versions[0].version;
+  const parts = lastVersion.split('.').map(Number);
+  
+  parts[2] = (parts[2] || 0) + 1;
+  
+  if (parts[2] > 99) {
+    parts[2] = 0;
+    parts[1] = (parts[1] || 0) + 1;
+  }
+  
+  if (parts[1] > 99) {
+    parts[1] = 0;
+    parts[0] = (parts[0] || 0) + 1;
+  }
+  
+  return parts.join('.');
+}
 
 export const createSkill = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, description, category, tags, visibility, version } = req.body;
+    logger.info('Creating skill', { userId: req.user?.userId, name: req.body.name, hasFile: !!req.file });
+    
+    const { name, description, category, tags, visibility, updateDescription, author, compatibility, status } = req.body;
 
-    // 验证用户已登录
     if (!req.user?.userId) {
-      res.status(401).json({
-        error: 'UNAUTHORIZED',
-        message: 'User must be logged in to create a skill'
-      });
+      logger.warn('Create skill failed - unauthorized', { ip: req.ip });
+      const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
-    // 检查是否有文件上传
     const hasFile = req.file != null;
 
-    // 如果没有文件，禁止设置为 public
     if (!hasFile && visibility === 'public') {
-      res.status(400).json({
-        error: 'PUBLIC_SKILL_REQUIRES_FILE',
-        message: 'Cannot set skill to public without uploading a file. Please upload a file or set visibility to private.'
-      });
+      logger.warn('Create skill failed - public skill requires file', { userId: req.user?.userId });
+      const error = createErrorResponse(ErrorCode.PUBLIC_SKILL_REQUIRES_FILE);
+      res.status(error.statusCode).json(error);
       return;
+    }
+
+    let finalStatus: 'draft' | 'pending' | 'approved' | 'rejected' = 'draft';
+    let autoReviewResult: { passed: boolean; issues?: string[]; warnings?: string[] } | undefined;
+
+    if (status === 'approved' || status === 'pending') {
+      if (hasFile) {
+        const tempDir = path.join(process.cwd(), 'temp', `skill-review-${Date.now()}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+        try {
+          const reviewResult = await reviewSkill({ name, description, category, tags }, req.file!.path);
+          autoReviewResult = {
+            passed: reviewResult.passed,
+            issues: reviewResult.reasons,
+            warnings: reviewResult.warnings,
+          };
+          if (reviewResult.passed) {
+            finalStatus = 'approved';
+          } else {
+            finalStatus = 'rejected';
+          }
+          logger.info('Skill auto review completed', { 
+            userId: req.user?.userId, 
+            passed: reviewResult.passed, 
+            status: finalStatus 
+          });
+        } finally {
+          if (fs.existsSync(tempDir)) {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+          }
+        }
+      } else {
+        finalStatus = 'draft';
+        autoReviewResult = {
+          passed: false,
+          issues: ['提交审核需要上传文件'],
+        };
+      }
+    } else {
+      finalStatus = 'draft';
     }
 
     let skillData: any = {
@@ -37,47 +107,37 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
       tags: tags || [],
       owner: req.user?.userId,
       visibility: visibility || 'private',
-      version: version || '1.0.0',
-      versions: [],
+      status: finalStatus,
+      version: '1.0.0',
       files: [],
+      author: author || undefined,
+      compatibility: compatibility || [],
     };
 
-    // 如果有文件，处理文件上传
     if (hasFile) {
-      // 检查文件类型是否为ZIP
       if (!req.file!.originalname.endsWith('.zip')) {
-        res.status(400).json({
-          error: 'INVALID_FILE_TYPE',
-          message: 'Only ZIP files are allowed'
-        });
+        logger.warn('Create skill failed - invalid file type', { userId: req.user?.userId, filename: req.file!.originalname });
+        const error = createErrorResponse(ErrorCode.INVALID_FILE_TYPE);
+        res.status(error.statusCode).json(error);
         return;
       }
 
-      // 创建临时目录用于解压和验证
       const tempDir = path.join(process.cwd(), 'temp', `skill-${Date.now()}`);
       fs.mkdirSync(tempDir, { recursive: true });
 
       try {
-        // 验证Skill结构
+        logger.debug('Validating skill structure', { tempDir, filePath: req.file!.path });
+        
         const validationResult = await validateSkillUpload(req.file!.path, tempDir);
         if (!validationResult.valid) {
-          res.status(400).json({
-            error: 'INVALID_SKILL_STRUCTURE',
-            message: 'Invalid skill structure',
-            details: validationResult.errors
-          });
+          logger.warn('Create skill failed - invalid skill structure', { userId: req.user?.userId, errors: validationResult.errors });
+          const error = createErrorResponse(ErrorCode.INVALID_SKILL_STRUCTURE, validationResult.errors);
+          res.status(error.statusCode).json(error);
           return;
         }
 
-        // 验证通过，添加文件信息
         const fileUrl = `/uploads/${req.file!.filename}`;
-        const newVersion = {
-          version: version || validationResult.structure?.version || '1.0.0',
-          url: fileUrl,
-          createdAt: new Date(),
-        };
-
-        skillData.versions = [newVersion];
+        
         skillData.files = [{
           filename: req.file!.originalname,
           originalName: req.file!.originalname,
@@ -86,33 +146,170 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
           mimetype: req.file!.mimetype,
         }];
 
-        // 更新技能信息（如果skill.json中有更新）
         if (validationResult.structure) {
           if (validationResult.structure.name) skillData.name = validationResult.structure.name;
           if (validationResult.structure.description) skillData.description = validationResult.structure.description;
-          if (validationResult.structure.version) skillData.version = validationResult.structure.version;
         }
+        
+        // 如果没有name，使用顶级目录名
+        if (!skillData.name && validationResult.topLevelDir) {
+          skillData.name = validationResult.topLevelDir;
+          logger.debug('Using top-level directory name as skill name', { name: skillData.name });
+        }
+        
+        logger.debug('Skill validation passed', { structure: validationResult.structure, topLevelDir: validationResult.topLevelDir });
       } finally {
-        // 清理临时目录
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
         }
       }
     }
 
+    // 检查是否有name
+    if (!skillData.name) {
+      logger.warn('Create skill failed - name is required', { userId: req.user?.userId });
+      const error = createErrorResponse(ErrorCode.NAME_REQUIRED);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    const existingSkill = await Skill.findOne({
+      owner: req.user?.userId,
+      name: skillData.name,
+    });
+
+    if (existingSkill) {
+      logger.info('Skill with same name exists, creating new version', {
+        skillId: existingSkill._id,
+        name: skillData.name,
+        userId: req.user?.userId,
+      });
+
+      const previousVersion = existingSkill.version;
+      const newVersion = await generateNextVersion(existingSkill._id);
+
+      if (hasFile) {
+        const fileUrl = `/uploads/${req.file!.filename}`;
+        const skillVersion = new SkillVersion({
+          skillId: existingSkill._id,
+          version: newVersion,
+          url: fileUrl,
+          filename: req.file!.filename,
+          originalName: req.file!.originalname,
+          size: req.file!.size,
+          mimetype: req.file!.mimetype,
+          updateDescription: updateDescription || `Update to version ${newVersion}`,
+        });
+        await skillVersion.save();
+        logger.debug('Skill version created', { skillVersionId: skillVersion._id, version: newVersion });
+
+        existingSkill.files.push({
+          filename: req.file!.originalname,
+          originalName: req.file!.originalname,
+          path: fileUrl,
+          size: req.file!.size,
+          mimetype: req.file!.mimetype,
+        });
+
+        const resourceVersion = new ResourceVersion({
+          resourceId: existingSkill._id,
+          resourceType: 'skill',
+          version: newVersion,
+          versionNumber: parseInt(newVersion.split('.').join('')),
+          content: skillData.description || existingSkill.description || '',
+          files: [{
+            filename: req.file!.originalname,
+            path: fileUrl,
+            size: req.file!.size,
+            mimetype: req.file!.mimetype,
+          }],
+          changelog: updateDescription || `Update to version ${newVersion}`,
+          tags: skillData.tags || existingSkill.tags || [],
+          isActive: true,
+          createdBy: req.user!.userId,
+        });
+        await resourceVersion.save();
+        logger.debug('ResourceVersion created', { resourceVersionId: resourceVersion._id, version: newVersion });
+      }
+
+      existingSkill.version = newVersion;
+      if (skillData.description) existingSkill.description = skillData.description;
+      if (skillData.category) existingSkill.category = skillData.category;
+      if (skillData.tags && skillData.tags.length > 0) existingSkill.tags = skillData.tags;
+      if (skillData.author) existingSkill.author = skillData.author;
+      if (skillData.compatibility && skillData.compatibility.length > 0) existingSkill.compatibility = skillData.compatibility;
+      if (visibility) existingSkill.visibility = visibility;
+
+      await existingSkill.save();
+
+      logger.info('Skill version updated successfully', {
+        skillId: existingSkill._id,
+        previousVersion,
+        newVersion,
+        userId: req.user?.userId,
+      });
+
+      res.status(200).json({
+        message: 'Skill version updated successfully',
+        skill: existingSkill,
+        isNew: false,
+        previousVersion,
+        currentVersion: newVersion,
+      });
+      return;
+    }
+
     const skill = new Skill(skillData);
     await skill.save();
+
+    if (hasFile) {
+      const fileUrl = `/uploads/${req.file!.filename}`;
+      const skillVersion = new SkillVersion({
+        skillId: skill._id,
+        version: '1.0.0',
+        url: fileUrl,
+        filename: req.file!.filename,
+        originalName: req.file!.originalname,
+        size: req.file!.size,
+        mimetype: req.file!.mimetype,
+        updateDescription: updateDescription || 'Initial version',
+      });
+      await skillVersion.save();
+      logger.debug('Skill version created', { skillVersionId: skillVersion._id, version: skillVersion.version });
+
+      const resourceVersion = new ResourceVersion({
+        resourceId: skill._id,
+        resourceType: 'skill',
+        version: '1.0.0',
+        versionNumber: 1,
+        content: skillData.description || '',
+        files: [{
+          filename: req.file!.originalname,
+          path: fileUrl,
+          size: req.file!.size,
+          mimetype: req.file!.mimetype,
+        }],
+        changelog: updateDescription || 'Initial version',
+        tags: skillData.tags || [],
+        isActive: true,
+        createdBy: req.user!.userId,
+      });
+      await resourceVersion.save();
+      logger.debug('ResourceVersion created', { resourceVersionId: resourceVersion._id, version: resourceVersion.version });
+    }
+
+    logger.info('Skill created successfully', { skillId: skill._id, userId: req.user?.userId, name: skill.name, visibility: skill.visibility, status: skill.status });
 
     res.status(201).json({
       message: 'Skill created successfully',
       skill,
+      isNew: true,
+      autoReviewResult,
     });
   } catch (error) {
-    console.error('Create skill error:', error);
-    res.status(500).json({
-      error: 'SERVER_ERROR',
-      message: 'Failed to create skill'
-    });
+    logger.error('Create skill failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -120,6 +317,8 @@ export const getSkills = async (req: AuthRequest, res: Response): Promise<void> 
   try {
     const { page = 1, pageSize = 12, category, search, sort = 'latest' } = req.query;
     const skip = (Number(page) - 1) * Number(pageSize);
+
+    logger.debug('Getting skills', { page, pageSize, category, search, sort, userId: req.user?.userId });
 
     let query: any = { visibility: 'public', status: 'approved' };
     
@@ -146,6 +345,8 @@ export const getSkills = async (req: AuthRequest, res: Response): Promise<void> 
       Skill.countDocuments(query)
     ]);
 
+    logger.info('Skills retrieved successfully', { count: skills.length, total, page, pageSize });
+
     res.json({
       skills,
       pagination: {
@@ -156,17 +357,24 @@ export const getSkills = async (req: AuthRequest, res: Response): Promise<void> 
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get skills' });
+    logger.error('Get skills failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
 export const getSkillById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    
+    logger.debug('Getting skill by ID', { skillId: id, userId: req.user?.userId });
+    
     const skill = await Skill.findById(id).populate('owner', 'username avatar');
     
     if (!skill) {
-      res.status(404).json({ error: 'Skill not found' });
+      logger.warn('Get skill failed - skill not found', { skillId: id, userId: req.user?.userId });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -176,46 +384,164 @@ export const getSkillById = async (req: AuthRequest, res: Response): Promise<voi
       (ownerId && String(ownerId) === req.user?.userId);
 
     if (!hasAccess) {
-      res.status(403).json({ error: 'Access denied' });
+      logger.warn('Get skill failed - access denied', { skillId: id, userId: req.user?.userId, ownerId, visibility: skill.visibility });
+      const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skillObj = skill.toObject();
     if (!skillObj.owner) {
-      skillObj.owner = {
-        _id: null,
+      (skillObj as any).owner = {
+        _id: undefined,
         username: 'Unknown User',
         avatar: null
       };
     }
 
+    logger.info('Skill retrieved successfully', { skillId: id, userId: req.user?.userId });
+
     res.json(skillObj);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get skill' });
+    logger.error('Get skill failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, skillId: req.params.id });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
 export const updateSkill = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const { name, description, category, tags, visibility, status, updateDescription } = req.body;
 
     const skill = await Skill.findById(id);
     if (!skill) {
-      res.status(404).json({ error: 'Skill not found' });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
-    Object.assign(skill, updates);
+    const hasFile = req.file != null;
+
+    if (hasFile) {
+      if (!req.file!.originalname.endsWith('.zip')) {
+        const error = createErrorResponse(ErrorCode.INVALID_FILE_TYPE);
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
+      const tempDir = path.join(process.cwd(), 'temp', `skill-${Date.now()}`);
+      fs.mkdirSync(tempDir, { recursive: true });
+
+      try {
+        const validationResult = await validateSkillUpload(req.file!.path, tempDir);
+        if (!validationResult.valid) {
+          const error = createErrorResponse(ErrorCode.INVALID_SKILL_STRUCTURE, validationResult.errors);
+          res.status(error.statusCode).json(error);
+          return;
+        }
+
+        const fileUrl = `/uploads/${req.file!.filename}`;
+        const nextVersion = await generateNextVersion(skill._id);
+        
+        const skillVersion = new SkillVersion({
+          skillId: skill._id,
+          version: nextVersion,
+          url: fileUrl,
+          filename: req.file!.filename,
+          originalName: req.file!.originalname,
+          size: req.file!.size,
+          mimetype: req.file!.mimetype,
+          updateDescription: updateDescription || `Update to version ${nextVersion}`,
+        });
+        await skillVersion.save();
+        
+        skill.version = nextVersion;
+        
+        skill.files.push({
+          filename: req.file!.originalname,
+          originalName: req.file!.originalname,
+          path: fileUrl,
+          size: req.file!.size,
+          mimetype: req.file!.mimetype,
+        });
+
+        if (validationResult.structure) {
+          if (validationResult.structure.name) skill.name = validationResult.structure.name;
+          if (validationResult.structure.description) skill.description = validationResult.structure.description;
+        }
+        
+        if (!skill.name && validationResult.topLevelDir) {
+          skill.name = validationResult.topLevelDir;
+          logger.debug('Using top-level directory name as skill name', { name: skill.name });
+        }
+        
+        logger.debug('Skill version created', { skillVersionId: skillVersion._id, version: nextVersion });
+      } finally {
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      }
+    }
+
+    if (name) skill.name = name;
+    if (description) skill.description = description;
+    if (category) skill.category = category;
+    if (tags) skill.tags = tags;
+    if (visibility) skill.visibility = visibility;
+    
+    let autoReviewResult: { passed: boolean; issues?: string[]; warnings?: string[] } | undefined;
+    
+    if (status === 'approved' || status === 'pending') {
+      if (hasFile || skill.files.length > 0) {
+        const filePath = hasFile ? req.file!.path : undefined;
+        const reviewResult = await reviewSkill({ name: skill.name, description: skill.description, category: skill.category, tags: skill.tags }, filePath);
+        autoReviewResult = {
+          passed: reviewResult.passed,
+          issues: reviewResult.reasons,
+          warnings: reviewResult.warnings,
+        };
+        if (reviewResult.passed) {
+          skill.status = 'approved';
+        } else {
+          skill.status = 'rejected';
+        }
+        logger.info('Skill update auto review completed', { 
+          skillId: skill._id,
+          userId: req.user?.userId, 
+          passed: reviewResult.passed, 
+          status: skill.status 
+        });
+      } else {
+        skill.status = 'draft';
+        autoReviewResult = {
+          passed: false,
+          issues: ['提交审核需要上传文件'],
+        };
+      }
+    } else if (status) {
+      skill.status = status;
+    }
+
+    if (!skill.name) {
+      logger.warn('Update skill failed - name is required', { userId: req.user?.userId, skillId: id });
+      const error = createErrorResponse(ErrorCode.NAME_REQUIRED);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
     await skill.save();
-    res.json(skill);
+    res.json({ skill, autoReviewResult });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update skill' });
+    logger.error('Update skill failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, skillId: req.params.id });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -225,19 +551,23 @@ export const deleteSkill = async (req: AuthRequest, res: Response): Promise<void
 
     const skill = await Skill.findById(id);
     if (!skill) {
-      res.status(404).json({ error: 'Skill not found' });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     await skill.deleteOne();
     res.json({ message: 'Skill deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete skill' });
+    logger.error('Delete skill failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, skillId: req.params.id });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -248,7 +578,8 @@ export const rateSkill = async (req: AuthRequest, res: Response): Promise<void> 
 
     const skill = await Skill.findById(id);
     if (!skill) {
-      res.status(404).json({ error: 'Skill not found' });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -263,57 +594,69 @@ export const rateSkill = async (req: AuthRequest, res: Response): Promise<void> 
     await skill.save();
     res.json({ message: 'Rating submitted', averageRating: skill.averageRating });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to rate skill' });
+    logger.error('Rate skill failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, skillId: req.params.id });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
 export const uploadSkillFile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const skillId = req.body.skillId;
+    const updateDescription = req.body.updateDescription;
     
     if (!req.file) {
-      res.status(400).json({ error: 'No file uploaded' });
+      const error = createErrorResponse(ErrorCode.NO_FILE_UPLOADED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({ error: 'Skill not found' });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
-    // 检查文件类型是否为ZIP
     if (!req.file.originalname.endsWith('.zip')) {
-      res.status(400).json({ error: 'Only ZIP files are allowed' });
+      const error = createErrorResponse(ErrorCode.INVALID_FILE_TYPE);
+      res.status(error.statusCode).json(error);
       return;
     }
 
-    // 创建临时目录用于解压和验证
     const tempDir = path.join(process.cwd(), 'temp', `skill-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
     try {
-      // 验证Skill结构
       const validationResult = await validateSkillUpload(req.file.path, tempDir);
       if (!validationResult.valid) {
-        res.status(400).json({ error: 'Invalid skill structure', details: validationResult.errors });
+        const error = createErrorResponse(ErrorCode.INVALID_SKILL_STRUCTURE, validationResult.errors);
+        res.status(error.statusCode).json(error);
         return;
       }
 
-      // 验证通过，保存文件
       const fileUrl = `/uploads/${req.file.filename}`;
-      const newVersion = {
-        version: req.body.version || validationResult.structure?.version || '1.0.0',
+      const nextVersion = await generateNextVersion(skill._id);
+      
+      const skillVersion = new SkillVersion({
+        skillId: skill._id,
+        version: nextVersion,
         url: fileUrl,
-        createdAt: new Date(),
-      };
-
-      skill.versions.push(newVersion as any);
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        updateDescription: updateDescription || `Update to version ${nextVersion}`,
+      });
+      await skillVersion.save();
+      
+      skill.version = nextVersion;
       skill.files.push({
         filename: req.file.originalname,
         originalName: req.file.originalname,
@@ -322,11 +665,9 @@ export const uploadSkillFile = async (req: AuthRequest, res: Response): Promise<
         mimetype: req.file.mimetype,
       });
 
-      // 更新技能信息（如果skill.json中有更新）
       if (validationResult.structure) {
         if (validationResult.structure.name) skill.name = validationResult.structure.name;
         if (validationResult.structure.description) skill.description = validationResult.structure.description;
-        if (validationResult.structure.version) skill.version = validationResult.structure.version;
       }
 
       await skill.save();
@@ -334,18 +675,18 @@ export const uploadSkillFile = async (req: AuthRequest, res: Response): Promise<
       res.json({ 
         message: 'File uploaded successfully', 
         url: fileUrl, 
-        version: newVersion,
+        version: nextVersion,
         structure: validationResult.structure
       });
     } finally {
-      // 清理临时目录
       if (fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     }
   } catch (error) {
-    console.error('Upload skill file error:', error);
-    res.status(500).json({ error: 'Failed to upload file' });
+    logger.error('Upload skill file failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, skillId: req.body.skillId });
+    const err = createErrorResponse(ErrorCode.FILE_UPLOAD_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -355,10 +696,8 @@ export const downloadSkill = async (req: AuthRequest, res: Response): Promise<vo
 
     const skill = await Skill.findById(id);
     if (!skill) {
-      res.status(404).json({
-        error: 'SKILL_NOT_FOUND',
-        message: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -367,19 +706,15 @@ export const downloadSkill = async (req: AuthRequest, res: Response): Promise<vo
       String(skill.owner) === req.user?.userId;
 
     if (!hasAccess) {
-      res.status(403).json({
-        error: 'ACCESS_DENIED',
-        message: 'Access denied'
-      });
+      const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
-    const latestVersion = skill.versions[skill.versions.length - 1];
+    const latestVersion = await SkillVersion.findOne({ skillId: skill._id }).sort({ createdAt: -1 });
     if (!latestVersion || !latestVersion.url) {
-      res.status(400).json({
-        error: 'NO_FILE_AVAILABLE',
-        message: 'This skill has no file available for download. Please upload a file first.'
-      });
+      const error = createErrorResponse(ErrorCode.NO_FILE_AVAILABLE);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -390,16 +725,12 @@ export const downloadSkill = async (req: AuthRequest, res: Response): Promise<vo
     if (fs.existsSync(filePath)) {
       res.download(filePath);
     } else {
-      res.status(404).json({
-        error: 'FILE_NOT_FOUND',
-        message: 'The skill file was not found on the server. Please contact the administrator.'
-      });
+      const error = createErrorResponse(ErrorCode.FILE_NOT_FOUND);
+      res.status(error.statusCode).json(error);
     }
   } catch (error) {
-    console.error('Download skill error:', error);
-    res.status(500).json({
-      error: 'DOWNLOAD_FAILED',
-      message: 'Failed to download skill. Please try again later.'
-    });
+    logger.error('Download skill failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, skillId: req.params.id });
+    const err = createErrorResponse(ErrorCode.DOWNLOAD_FAILED);
+    res.status(err.statusCode).json(err);
   }
 };

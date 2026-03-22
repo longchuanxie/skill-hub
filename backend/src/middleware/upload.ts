@@ -2,6 +2,9 @@ import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import { Request } from 'express';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('uploadMiddleware');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -27,6 +30,12 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
   if (allowedTypes.includes(ext)) {
     cb(null, true);
   } else {
+    logger.warn('File upload rejected - invalid file type', { 
+      filename: file.originalname, 
+      mimetype: file.mimetype, 
+      ext,
+      ip: req.ip 
+    });
     cb(new Error(`File type ${ext} not allowed`));
   }
 };

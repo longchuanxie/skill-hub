@@ -25,12 +25,20 @@ export const getApiDocs = async (req: any, res: Response) => {
                 example: 1,
               },
               {
-                name: 'limit',
+                name: 'pageSize',
                 type: 'number',
                 required: false,
-                description: '每页数量，默认20',
+                description: '每页数量，默认12',
                 location: 'query',
-                example: 20,
+                example: 12,
+              },
+              {
+                name: 'category',
+                type: 'string',
+                required: false,
+                description: '分类筛选',
+                location: 'query',
+                example: '编程',
               },
               {
                 name: 'search',
@@ -40,27 +48,22 @@ export const getApiDocs = async (req: any, res: Response) => {
                 location: 'query',
                 example: '代码审查',
               },
-              {
-                name: 'tags',
-                type: 'string[]',
-                required: false,
-                description: '标签筛选',
-                location: 'query',
-                example: ['code', 'review'],
-              },
             ],
             responses: [
               {
                 statusCode: 200,
                 description: '获取成功',
                 schema: {
-                  items: 'array',
-                  total: 'number',
-                  page: 'number',
-                  limit: 'number',
+                  skills: 'array',
+                  pagination: {
+                    page: 'number',
+                    pageSize: 'number',
+                    total: 'number',
+                    pages: 'number',
+                  },
                 },
                 example: {
-                  items: [
+                  skills: [
                     {
                       id: 'skill_123',
                       description: '自动审查代码质量问题',
@@ -78,9 +81,12 @@ export const getApiDocs = async (req: any, res: Response) => {
                       createdAt: '2024-01-15T10:00:00Z',
                     },
                   ],
-                  total: 156,
-                  page: 1,
-                  limit: 20,
+                  pagination: {
+                    page: 1,
+                    pageSize: 12,
+                    total: 156,
+                    pages: 13,
+                  },
                 },
               },
             ],
@@ -103,12 +109,20 @@ export const getApiDocs = async (req: any, res: Response) => {
                 example: 1,
               },
               {
-                name: 'limit',
+                name: 'pageSize',
                 type: 'number',
                 required: false,
-                description: '每页数量，默认20',
+                description: '每页数量，默认12',
                 location: 'query',
-                example: 20,
+                example: 12,
+              },
+              {
+                name: 'category',
+                type: 'string',
+                required: false,
+                description: '分类筛选',
+                location: 'query',
+                example: '销售',
               },
               {
                 name: 'search',
@@ -124,85 +138,14 @@ export const getApiDocs = async (req: any, res: Response) => {
                 statusCode: 200,
                 description: '获取成功',
                 schema: {
-                  items: 'array',
-                  total: 'number',
-                  page: 'number',
-                  limit: 'number',
+                  prompts: 'array',
+                  pagination: {
+                    page: 'number',
+                    pageSize: 'number',
+                    total: 'number',
+                    pages: 'number',
+                  },
                 },
-              },
-            ],
-          },
-          {
-            id: 'agent-enterprise-skills',
-            method: 'GET',
-            path: '/api/agent/enterprise/skills',
-            title: '获取企业Skill列表',
-            description: '获取当前Agent所属企业的Skill列表，需要canReadEnterprise权限',
-            category: 'Agent API',
-            authentication: true,
-            parameters: [
-              {
-                name: 'page',
-                type: 'number',
-                required: false,
-                description: '页码，默认1',
-                location: 'query',
-                example: 1,
-              },
-              {
-                name: 'limit',
-                type: 'number',
-                required: false,
-                description: '每页数量，默认20',
-                location: 'query',
-                example: 20,
-              },
-            ],
-            responses: [
-              {
-                statusCode: 200,
-                description: '获取成功',
-              },
-              {
-                statusCode: 403,
-                description: '权限不足',
-              },
-            ],
-          },
-          {
-            id: 'agent-enterprise-prompts',
-            method: 'GET',
-            path: '/api/agent/enterprise/prompts',
-            title: '获取企业Prompt列表',
-            description: '获取当前Agent所属企业的Prompt列表，需要canReadEnterprise权限',
-            category: 'Agent API',
-            authentication: true,
-            parameters: [
-              {
-                name: 'page',
-                type: 'number',
-                required: false,
-                description: '页码，默认1',
-                location: 'query',
-                example: 1,
-              },
-              {
-                name: 'limit',
-                type: 'number',
-                required: false,
-                description: '每页数量，默认20',
-                location: 'query',
-                example: 20,
-              },
-            ],
-            responses: [
-              {
-                statusCode: 200,
-                description: '获取成功',
-              },
-              {
-                statusCode: 403,
-                description: '权限不足',
               },
             ],
           },
@@ -210,8 +153,8 @@ export const getApiDocs = async (req: any, res: Response) => {
             id: 'agent-skill-download',
             method: 'GET',
             path: '/api/agent/skills/:id/download',
-            title: '下载Skill',
-            description: '下载指定Skill文件，需要canDownload权限',
+            title: '下载Skill文件',
+            description: '下载指定Skill的压缩包文件',
             category: 'Agent API',
             authentication: true,
             parameters: [
@@ -227,44 +170,15 @@ export const getApiDocs = async (req: any, res: Response) => {
             responses: [
               {
                 statusCode: 200,
-                description: '下载成功，返回文件',
+                description: '下载成功，返回文件流',
               },
               {
                 statusCode: 403,
-                description: '权限不足或无下载权限',
+                description: '权限不足或无访问权限',
               },
               {
                 statusCode: 404,
-                description: 'Skill不存在',
-              },
-            ],
-          },
-          {
-            id: 'agent-prompt-detail',
-            method: 'GET',
-            path: '/api/agent/prompts/:id',
-            title: '获取Prompt详情',
-            description: '获取指定Prompt的详细信息',
-            category: 'Agent API',
-            authentication: true,
-            parameters: [
-              {
-                name: 'id',
-                type: 'string',
-                required: true,
-                description: 'Prompt ID',
-                location: 'path',
-                example: 'prompt_123456',
-              },
-            ],
-            responses: [
-              {
-                statusCode: 200,
-                description: '获取成功',
-              },
-              {
-                statusCode: 404,
-                description: 'Prompt不存在',
+                description: 'Skill不存在或文件未找到',
               },
             ],
           },
@@ -273,7 +187,7 @@ export const getApiDocs = async (req: any, res: Response) => {
             method: 'POST',
             path: '/api/agent/skills',
             title: '上传Skill',
-            description: '上传新的Skill到企业资源，需要canUpload权限',
+            description: '上传新的Skill到企业资源，需要canWrite权限',
             category: 'Agent API',
             authentication: true,
             requestBody: {
@@ -288,7 +202,6 @@ export const getApiDocs = async (req: any, res: Response) => {
               required: true,
               description: 'Skill信息',
               example: {
-                name: '新Skill名称',
                 description: 'Skill描述',
                 content: 'base64编码的Skill文件内容',
                 tags: ['ai', 'assistant'],
@@ -311,13 +224,12 @@ export const getApiDocs = async (req: any, res: Response) => {
             method: 'POST',
             path: '/api/agent/prompts',
             title: '上传Prompt',
-            description: '上传新的Prompt到企业资源，需要canUpload权限',
+            description: '上传新的Prompt到企业资源，需要canWrite权限',
             category: 'Agent API',
             authentication: true,
             requestBody: {
               contentType: 'application/json',
               schema: {
-                name: 'string',
                 content: 'string',
                 tags: 'array',
                 marketType: 'string',
@@ -341,12 +253,90 @@ export const getApiDocs = async (req: any, res: Response) => {
               },
             ],
           },
+          {
+            id: 'agent-check-update',
+            method: 'GET',
+            path: '/api/agent/check-update',
+            title: '检查资源更新',
+            description: '检查是否有同名skill或prompt的新版本可用',
+            category: 'Agent API',
+            authentication: true,
+            parameters: [
+              {
+                name: 'resourceType',
+                type: 'string',
+                required: true,
+                description: '资源类型，skill或prompt',
+                location: 'query',
+                example: 'skill',
+              },
+              {
+                name: 'name',
+                type: 'string',
+                required: true,
+                description: '资源名称',
+                location: 'query',
+                example: '代码审查助手',
+              },
+              {
+                name: 'version',
+                type: 'string',
+                required: true,
+                description: '当前版本号',
+                location: 'query',
+                example: '1.0.0',
+              },
+            ],
+            responses: [
+              {
+                statusCode: 200,
+                description: '检查成功',
+                schema: {
+                  hasUpdate: 'boolean',
+                  latestVersion: 'string',
+                  currentVersion: 'string',
+                  updateAvailable: 'boolean',
+                  changelog: 'string | null',
+                },
+                example: {
+                  hasUpdate: true,
+                  latestVersion: '1.0.1',
+                  currentVersion: '1.0.0',
+                  updateAvailable: true,
+                  changelog: 'Bug fixes',
+                },
+              },
+              {
+                statusCode: 400,
+                description: '参数错误',
+                example: {
+                  error: 'MISSING_PARAMETERS',
+                  message: 'resourceType, name and version are required',
+                },
+              },
+              {
+                statusCode: 404,
+                description: '资源不存在',
+                example: {
+                  error: 'RESOURCE_NOT_FOUND',
+                  message: 'No skill found with the given name',
+                },
+              },
+            ],
+          },
         ],
       },
     ];
 
-    res.json({ data: apiDocs });
+    res.json({
+      success: true,
+      data: apiDocs,
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get API docs' });
+    console.error('Error fetching API docs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch API documentation',
+    });
   }
 };

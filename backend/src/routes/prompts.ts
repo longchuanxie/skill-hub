@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, optionalAuth } from '../middleware/auth';
-import { createPrompt, getPrompts, getPromptById, updatePrompt, deletePrompt, ratePrompt, renderPrompt, copyPrompt, getPromptVersions, rollbackPrompt, compareVersions } from '../controllers/PromptController';
+import { createPrompt, getPrompts, getPromptById, updatePrompt, deletePrompt, ratePrompt, renderPrompt, copyPrompt, rollbackPrompt, compareVersions } from '../controllers/PromptController';
 import { contentSecurityCheck } from '../middleware/contentSecurity';
 import { body } from 'express-validator';
 
@@ -20,7 +20,6 @@ router.delete('/:id', authenticate, deletePrompt);
 router.post('/:id/rate', authenticate, ratePrompt);
 router.post('/:id/render', authenticate, renderPrompt);
 router.post('/:id/copy', authenticate, copyPrompt);
-router.get('/:id/versions', optionalAuth, getPromptVersions);
 router.post('/:id/rollback/:version', authenticate, rollbackPrompt);
 router.get('/:id/compare', optionalAuth, compareVersions);
 

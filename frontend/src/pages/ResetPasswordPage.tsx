@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../api/auth';
+
+const passwordStrengthRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
 const ResetPasswordPage: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -8,18 +10,55 @@ const ResetPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [tokenError, setTokenError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+
+  useEffect(() => {
+    if (!token) {
+      setTokenError('Invalid or missing reset token. Please request a new password reset link.');
+    }
+  }, [token]);
+
+  const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+    if (pwd.length > 128) {
+      return 'Password must not exceed 128 characters';
+    }
+    if (!/[a-z]/.test(pwd)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/\d/.test(pwd)) {
+      return 'Password must contain at least one number';
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) {
+      return 'Password must contain at least one special character';
+    }
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!token) {
+      setError('Invalid reset token');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -27,17 +66,48 @@ const ResetPasswordPage: React.FC = () => {
     setError('');
 
     try {
-      await authApi.resetPassword({ token: 'manual', newPassword: password });
+      await authApi.resetPassword({ token, newPassword: password });
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');
       }, 3000);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to reset password');
+      const errorCode = err.response?.data?.code;
+      if (errorCode === 'PASSWORD_RESET_TOKEN_EXPIRED') {
+        setError('Reset link has expired. Please request a new one.');
+      } else if (errorCode === 'PASSWORD_RESET_TOKEN_INVALID') {
+        setError('Invalid reset token. Please request a new password reset.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to reset password');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (tokenError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-xl border-2 border-gray-200 text-center">
+          <div className="mb-6">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto border-2 border-red-200">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-black mb-3">Invalid Link</h2>
+          <p className="text-gray-600 mb-8">{tokenError}</p>
+          <Link to="/forgot-password" className="inline-flex items-center gap-2 text-black hover:text-gray-700 font-medium">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Request new reset link
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
@@ -87,6 +157,32 @@ const ResetPasswordPage: React.FC = () => {
             {error}
           </div>
         )}
+
+        <div className="mb-6 p-4 bg-gray-50 border-2 border-gray-200 rounded-lg">
+          <p className="text-sm font-medium text-gray-700 mb-2">Password requirements:</p>
+          <ul className="text-sm text-gray-600 space-y-1">
+            <li className="flex items-center gap-2">
+              <span className={password.length >= 8 ? 'text-green-600' : 'text-gray-400'}>✓</span>
+              At least 8 characters
+            </li>
+            <li className="flex items-center gap-2">
+              <span className={/[A-Z]/.test(password) ? 'text-green-600' : 'text-gray-400'}>✓</span>
+              One uppercase letter
+            </li>
+            <li className="flex items-center gap-2">
+              <span className={/[a-z]/.test(password) ? 'text-green-600' : 'text-gray-400'}>✓</span>
+              One lowercase letter
+            </li>
+            <li className="flex items-center gap-2">
+              <span className={/\d/.test(password) ? 'text-green-600' : 'text-gray-400'}>✓</span>
+              One number
+            </li>
+            <li className="flex items-center gap-2">
+              <span className={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? 'text-green-600' : 'text-gray-400'}>✓</span>
+              One special character
+            </li>
+          </ul>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-5">

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
+import { useTranslation } from 'react-i18next';
 
 interface ForgotPasswordPageProps {}
 
 const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = () => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -19,7 +21,12 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = () => {
       await authApi.forgotPassword({ email });
       setSent(true);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send reset email');
+      const errorCode = err.response?.data?.code;
+      if (errorCode) {
+        setError(t(`errors.${errorCode}`));
+      } else {
+        setError(err.response?.data?.message || 'Failed to send reset email');
+      }
     } finally {
       setLoading(false);
     }
@@ -36,15 +43,15 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = () => {
               </svg>
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-black mb-3">Check your email</h2>
+          <h2 className="text-2xl font-bold text-black mb-3">{t('auth.checkYourEmail', 'Check your email')}</h2>
           <p className="text-gray-600 mb-8">
-            We've sent a password reset link to your email address.
+            {t('auth.resetLinkSent', "We've sent a password reset link to your email address.")}
           </p>
           <Link to="/login" className="inline-flex items-center gap-2 text-black hover:text-gray-700 font-medium">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Back to login
+            {t('auth.backToLogin', 'Back to login')}
           </Link>
         </div>
       </div>
@@ -61,8 +68,8 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = () => {
             </svg>
             <span className="text-2xl font-bold text-black">SkillHub</span>
           </div>
-          <h1 className="text-2xl font-bold text-black mb-2">Forgot Password</h1>
-          <p className="text-gray-600">Enter your email to reset your password</p>
+          <h1 className="text-2xl font-bold text-black mb-2">{t('auth.forgotPassword', 'Forgot Password')}</h1>
+          <p className="text-gray-600">{t('auth.forgotPasswordDesc', 'Enter your email to reset your password')}</p>
         </div>
 
         {error && (
@@ -80,15 +87,16 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              Email
+              {t('auth.email', 'Email')}
             </label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              placeholder={t('auth.emailPlaceholder', 'Enter your email')}
               required
+              maxLength={100}
               className="w-full h-10 px-3 py-2 border-2 border-gray-200 rounded-lg bg-white focus:border-black focus:outline-none transition-colors"
             />
           </div>
@@ -101,7 +109,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = () => {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            {loading ? 'Sending...' : 'Send Reset Link'}
+            {loading ? t('auth.sending', 'Sending...') : t('auth.sendResetLink', 'Send Reset Link')}
           </button>
         </form>
 
@@ -110,7 +118,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = () => {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Back to login
+            {t('auth.backToLogin', 'Back to login')}
           </Link>
         </div>
       </div>

@@ -18,6 +18,13 @@ interface Skill {
   tags: string[];
   visibility: string;
   status: string;
+  files: Array<{
+    filename: string;
+    originalName: string;
+    path: string;
+    size: number;
+    mimetype: string;
+  }>;
 }
 
 const SkillEditPage: React.FC = () => {
@@ -29,11 +36,21 @@ const SkillEditPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [skillFile, setSkillFile] = useState<File | undefined>(undefined);
+  const [existingFiles, setExistingFiles] = useState<Array<{
+    filename: string;
+    originalName: string;
+    path: string;
+    size: number;
+    mimetype: string;
+  }>>([]);
+
+  const hasEnterprise = !!user?.enterpriseId;
 
   const [form, setForm] = useState({
     name: '',
     description: '',
-    version: '',
+    updateDescription: '',
     category: 'coding',
     tags: '',
     visibility: 'private',
@@ -49,12 +66,15 @@ const SkillEditPage: React.FC = () => {
         setForm({
           name: skill.name,
           description: skill.description,
-          version: skill.version,
+          updateDescription: '',
           category: skill.category,
           tags: skill.tags.join(', '),
           visibility: skill.visibility,
           status: skill.status,
         });
+        if (skill.files && skill.files.length > 0) {
+          setExistingFiles(skill.files);
+        }
       } catch (err) {
         setError(t('edit.error.loadFailed'));
       } finally {
@@ -73,26 +93,30 @@ const SkillEditPage: React.FC = () => {
     setSuccess('');
 
     try {
-      await fetch(`/api/skills/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${useAuthStore.getState().token}`,
-        },
-        body: JSON.stringify({
-          name: form.name,
-          description: form.description,
-          version: form.version,
-          category: form.category,
-          tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
-          visibility: form.visibility,
-          status: form.status,
-        }),
+      await skillApi.updateSkill(id, {
+        name: form.name,
+        description: form.description,
+        updateDescription: form.updateDescription,
+        category: form.category,
+        tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+        visibility: form.visibility,
+        status: form.status,
+        file: skillFile,
       });
       setSuccess(t('edit.success'));
       setTimeout(() => navigate(`/skills/${id}`), 1500);
-    } catch (err) {
-      setError(t('edit.error.updateFailed'));
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string; message?: string } } };
+      const errorCode = error.response?.data?.error;
+      if (errorCode === 'PUBLIC_SKILL_REQUIRES_FILE') {
+        setError(t('errors.publicSkillRequiresFile'));
+      } else if (errorCode === 'INVALID_FILE_TYPE') {
+        setError(t('errors.invalidFileType') || 'Only ZIP files are allowed');
+      } else if (errorCode === 'INVALID_SKILL_STRUCTURE') {
+        setError(t('errors.invalidSkillStructure') || 'Invalid skill structure');
+      } else {
+        setError(error.response?.data?.message || t('edit.error.updateFailed'));
+      }
     } finally {
       setSaving(false);
     }
@@ -122,14 +146,14 @@ const SkillEditPage: React.FC = () => {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to Skill
+          {t('skills.backToSkills')}
         </Button>
 
         <div className="flex items-center gap-3 mb-6">
           <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
-          <h1 className="text-3xl font-bold text-black">Edit Skill</h1>
+          <h1 className="text-3xl font-bold text-black">{t('skills.editSkill')}</h1>
         </div>
 
         {error && (
@@ -155,12 +179,12 @@ const SkillEditPage: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
-              Name
+              {t('skills.skillName')}
             </label>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Skill name"
+              placeholder={t('upload.placeholder.name')}
               required
             />
           </div>
@@ -170,12 +194,12 @@ const SkillEditPage: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Description
+              {t('skills.description')}
             </label>
             <Textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Describe your skill"
+              placeholder={t('upload.placeholder.description')}
               required
               rows={3}
               className="border-2 border-gray-200 focus:border-black"
@@ -186,14 +210,14 @@ const SkillEditPage: React.FC = () => {
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-black mb-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Version
+                {t('upload.updateDescription')}
               </label>
               <Input
-                value={form.version}
-                onChange={(e) => setForm({ ...form, version: e.target.value })}
-                placeholder="1.0.0"
+                value={form.updateDescription}
+                onChange={(e) => setForm({ ...form, updateDescription: e.target.value })}
+                placeholder={t('upload.placeholder.updateDescription')}
                 required
               />
             </div>
@@ -202,18 +226,18 @@ const SkillEditPage: React.FC = () => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
-                Category
+                {t('skills.category')}
               </label>
               <Select value={form.category} onValueChange={(value) => setForm({ ...form, category: value })}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={t('skills.allCategories')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="coding">Coding</SelectItem>
-                  <SelectItem value="writing">Writing</SelectItem>
-                  <SelectItem value="design">Design</SelectItem>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="data-analysis">Data Analysis</SelectItem>
+                  <SelectItem value="coding">{t('upload.categories.coding')}</SelectItem>
+                  <SelectItem value="writing">{t('upload.categories.writing')}</SelectItem>
+                  <SelectItem value="design">{t('upload.categories.design')}</SelectItem>
+                  <SelectItem value="marketing">{t('upload.categories.marketing')}</SelectItem>
+                  <SelectItem value="data-analysis">{t('upload.categories.dataAnalysis')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -225,17 +249,27 @@ const SkillEditPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              Visibility
+              {t('skills.visibility')}
             </label>
             <Select value={form.visibility} onValueChange={(value) => setForm({ ...form, visibility: value })}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select visibility" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="private">Private</SelectItem>
-                <SelectItem value="public">Public</SelectItem>
+                <SelectItem value="private">{t('upload.visibilityOptions.private')}</SelectItem>
+                {hasEnterprise && (
+                  <SelectItem value="enterprise">{t('upload.visibilityOptions.enterprise')}</SelectItem>
+                )}
+                <SelectItem value="shared">{t('upload.visibilityOptions.shared')}</SelectItem>
+                <SelectItem value="public">{t('upload.visibilityOptions.public')}</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              {form.visibility === 'private' && t('upload.visibilityOptions.privateDesc')}
+              {form.visibility === 'public' && t('upload.visibilityOptions.publicDesc')}
+              {form.visibility === 'enterprise' && t('upload.visibilityOptions.enterpriseDesc')}
+              {form.visibility === 'shared' && t('upload.visibilityOptions.sharedDesc')}
+            </p>
           </div>
 
           <div>
@@ -243,19 +277,22 @@ const SkillEditPage: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Status
+              {t('upload.status')}
             </label>
-            <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+                form.status === 'approved' ? 'bg-green-100 text-green-800' :
+                form.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                form.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {form.status === 'draft' ? t('upload.statusOptions.draft') :
+                 form.status === 'pending' ? t('upload.statusOptions.pending') :
+                 form.status === 'approved' ? t('upload.statusOptions.approved') :
+                 form.status === 'rejected' ? t('upload.statusOptions.rejected') : form.status}
+              </span>
+              <span className="text-xs text-gray-500">({t('common.readOnly') || '只读'})</span>
+            </div>
           </div>
 
           <div>
@@ -263,13 +300,50 @@ const SkillEditPage: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
-              Tags (comma separated)
+              {t('skills.tags')}
             </label>
             <Input
               value={form.tags}
               onChange={(e) => setForm({ ...form, tags: e.target.value })}
-              placeholder="tag1, tag2, tag3"
+              placeholder={t('upload.placeholder.tags')}
             />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-black mb-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              {t('upload.skillFile')} (ZIP)
+            </label>
+            {existingFiles.length > 0 && (
+              <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm font-medium text-black mb-2">{t('upload.existingFiles') || '现有文件'}:</p>
+                <ul className="space-y-1">
+                  {existingFiles.map((file, index) => (
+                    <li key={index} className="flex items-center gap-2 text-sm text-gray-700">
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="font-medium">{file.originalName || file.filename}</span>
+                      <span className="text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-gray-500 mt-2">
+                  {t('upload.replaceFileHint') || '上传新文件将替换现有文件'}
+                </p>
+              </div>
+            )}
+            <Input
+              type="file"
+              accept=".zip"
+              onChange={(e) => setSkillFile(e.target.files?.[0])}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {t('upload.skillFileOptional')}
+            </p>
           </div>
 
           <div className="flex gap-3">
@@ -277,10 +351,10 @@ const SkillEditPage: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? t('common.loading') : t('edit.save')}
             </Button>
             <Button type="button" variant="outline" onClick={() => navigate(`/skills/${id}`)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </form>

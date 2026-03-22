@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import HomePage from './pages/HomePage';
+import SearchPage from './pages/SearchPage';
 import SkillsMarketPage from './pages/SkillsMarketPage';
 import PromptsMarketPage from './pages/PromptsMarketPage';
 import MyResourcesPage from './pages/MyResourcesPage';
@@ -14,6 +15,11 @@ import SettingsPage from './pages/SettingsPage';
 import UploadPage from './pages/UploadPage';
 import SkillDetailPage from './pages/SkillDetailPage';
 import SkillEditPage from './pages/SkillEditPage';
+import SkillOnlineTestPage from './pages/SkillOnlineTestPage';
+import SkillPermissionsPage from './pages/SkillPermissionsPage';
+import SkillVersionHistoryPage from './pages/SkillVersionHistoryPage';
+import SkillVersionComparePage from './pages/SkillVersionComparePage';
+import SkillPreviewPage from './pages/SkillPreviewPage';
 import PromptDetailPage from './pages/PromptDetailPage';
 import PromptEditPage from './pages/PromptEditPage';
 import PromptVersionHistoryPage from './pages/PromptVersionHistoryPage';
@@ -44,9 +50,15 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         <Route path="/" element={<Layout><HomePage /></Layout>} />
+        <Route path="/search" element={<Layout><SearchPage /></Layout>} />
         <Route path="/skills" element={<SkillsMarketPage />} />
         <Route path="/skills/:id" element={<SkillDetailPage />} />
+        <Route path="/skills/:id/preview" element={<SkillPreviewPage />} />
         <Route path="/skills/:id/edit" element={<ProtectedRoute><SkillEditPage /></ProtectedRoute>} />
+        <Route path="/skills/:id/test" element={<ProtectedRoute><SkillOnlineTestPage /></ProtectedRoute>} />
+        <Route path="/skills/:id/permissions" element={<ProtectedRoute><SkillPermissionsPage /></ProtectedRoute>} />
+        <Route path="/skills/:id/versions" element={<ProtectedRoute><SkillVersionHistoryPage /></ProtectedRoute>} />
+        <Route path="/skills/:id/versions/compare" element={<ProtectedRoute><SkillVersionComparePage /></ProtectedRoute>} />
         <Route path="/prompts" element={<PromptsMarketPage />} />
         <Route path="/prompts/:id" element={<PromptDetailPage />} />
         <Route path="/prompts/:id/edit" element={<ProtectedRoute><PromptEditPage /></ProtectedRoute>} />

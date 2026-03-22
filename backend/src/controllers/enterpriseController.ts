@@ -2,19 +2,26 @@ import { Response, Request, Express } from 'express';
 import { Enterprise } from '../models/Enterprise';
 import { User } from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('EnterpriseController');
 
 export const createEnterprise = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name, description } = req.body;
+    
+    logger.info('Creating enterprise', { userId: req.user?.userId, name });
 
     const existingEnterprise = await Enterprise.findOne({ owner: req.user?.userId });
     if (existingEnterprise) {
+      logger.warn('Create enterprise failed - user already owns an enterprise', { userId: req.user?.userId });
       res.status(400).json({ error: 'You already own an enterprise' });
       return;
     }
 
     const existingName = await Enterprise.findOne({ name });
     if (existingName) {
+      logger.warn('Create enterprise failed - name already exists', { name });
       res.status(400).json({ error: 'Enterprise name already exists' });
       return;
     }
@@ -34,12 +41,16 @@ export const createEnterprise = async (req: AuthRequest, res: Response): Promise
       await user.save();
     }
 
+    logger.info('Enterprise created successfully', { enterpriseId: enterprise._id, userId: req.user?.userId, name });
+
     res.status(201).json(enterprise);
   } catch (error: any) {
     if (error.code === 11000) {
+      logger.warn('Create enterprise failed - duplicate key error', { name: req.body.name });
       res.status(400).json({ error: 'Enterprise name already exists' });
       return;
     }
+    logger.error('Create enterprise failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
     res.status(500).json({ error: 'Failed to create enterprise' });
   }
 };
@@ -48,11 +59,14 @@ export const getEnterprise = async (req: AuthRequest, res: Response): Promise<vo
   try {
     const { id } = req.params;
     
+    logger.debug('Getting enterprise by ID', { enterpriseId: id, userId: req.user?.userId });
+    
     const enterprise = await Enterprise.findById(id)
       .populate('owner', 'username email avatar')
       .populate('members.userId', 'username email avatar');
     
     if (!enterprise) {
+      logger.warn('Get enterprise failed - enterprise not found', { enterpriseId: id, userId: req.user?.userId });
       res.status(404).json({ error: 'Enterprise not found' });
       return;
     }
@@ -63,12 +77,14 @@ export const getEnterprise = async (req: AuthRequest, res: Response): Promise<vo
     const isOwner = (enterprise.owner as any)._id?.toString() === req.user?.userId;
 
     if (!isMember && !isOwner && enterprise.subscription.plan === 'free') {
+      logger.warn('Get enterprise failed - access denied', { enterpriseId: id, userId: req.user?.userId, plan: enterprise.subscription.plan });
       res.status(403).json({ error: 'Access denied' });
       return;
     }
 
     res.json(enterprise);
   } catch (error) {
+    logger.error('Get enterprise failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, enterpriseId: req.params.id });
     res.status(500).json({ error: 'Failed to get enterprise' });
   }
 };

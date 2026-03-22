@@ -38,15 +38,17 @@ const PromptEditPage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const hasEnterprise = !!user?.enterpriseId;
+
   const [form, setForm] = useState({
     name: '',
     description: '',
     content: '',
-    version: '',
     category: 'creative',
     tags: '',
     visibility: 'private',
     status: 'draft',
+    updateDescription: '',
   });
 
   useEffect(() => {
@@ -59,11 +61,11 @@ const PromptEditPage: React.FC = () => {
           name: prompt.name,
           description: prompt.description,
           content: prompt.content,
-          version: prompt.version,
           category: prompt.category,
           tags: prompt.tags.join(', '),
           visibility: prompt.visibility,
           status: prompt.status,
+          updateDescription: '',
         });
       } catch (err) {
         setError(t('prompts.error.loadFailed'));
@@ -93,11 +95,11 @@ const PromptEditPage: React.FC = () => {
           name: form.name,
           description: form.description,
           content: form.content,
-          version: form.version,
           category: form.category,
           tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
           visibility: form.visibility,
           status: form.status,
+          updateDescription: form.updateDescription,
         }),
       });
       setSuccess(t('edit.success'));
@@ -210,21 +212,26 @@ const PromptEditPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-black mb-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-                {t('upload.version')}
-              </label>
-              <Input
-                value={form.version}
-                onChange={(e) => setForm({ ...form, version: e.target.value })}
-                placeholder={t('upload.placeholder.version')}
-                required
-              />
-            </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-black mb-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              {t('upload.updateDescription') || 'Update Description'}
+            </label>
+            <Textarea
+              value={form.updateDescription}
+              onChange={(e) => setForm({ ...form, updateDescription: e.target.value })}
+              placeholder={t('upload.placeholder.updateDescription') || 'Describe what changed in this version'}
+              rows={2}
+              className="border-2 border-gray-200 focus:border-black"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {t('upload.updateDescriptionOptional') || 'Optional: Describe the changes made in this version'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-black mb-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -261,9 +268,19 @@ const PromptEditPage: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="private">{t('upload.visibilityOptions.private')}</SelectItem>
+                {hasEnterprise && (
+                  <SelectItem value="enterprise">{t('upload.visibilityOptions.enterprise')}</SelectItem>
+                )}
+                <SelectItem value="shared">{t('upload.visibilityOptions.shared')}</SelectItem>
                 <SelectItem value="public">{t('upload.visibilityOptions.public')}</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              {form.visibility === 'private' && t('upload.visibilityOptions.privateDesc')}
+              {form.visibility === 'public' && t('upload.visibilityOptions.publicDesc')}
+              {form.visibility === 'enterprise' && t('upload.visibilityOptions.enterpriseDesc')}
+              {form.visibility === 'shared' && t('upload.visibilityOptions.sharedDesc')}
+            </p>
           </div>
 
           <div>
@@ -273,17 +290,20 @@ const PromptEditPage: React.FC = () => {
               </svg>
               {t('upload.status')}
             </label>
-            <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={t('upload.placeholder.status')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">{t('upload.statusOptions.draft')}</SelectItem>
-                <SelectItem value="pending">{t('upload.statusOptions.pending')}</SelectItem>
-                <SelectItem value="approved">{t('upload.statusOptions.approved')}</SelectItem>
-                <SelectItem value="rejected">{t('upload.statusOptions.rejected')}</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+                form.status === 'approved' ? 'bg-green-100 text-green-800' :
+                form.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                form.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {form.status === 'draft' ? t('upload.statusOptions.draft') :
+                 form.status === 'pending' ? t('upload.statusOptions.pending') :
+                 form.status === 'approved' ? t('upload.statusOptions.approved') :
+                 form.status === 'rejected' ? t('upload.statusOptions.rejected') : form.status}
+              </span>
+              <span className="text-xs text-gray-500">({t('common.readOnly') || '只读'})</span>
+            </div>
           </div>
 
           <div>
