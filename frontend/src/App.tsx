@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import HomePage from './pages/HomePage';
+import SearchPage from './pages/SearchPage';
 import SkillsMarketPage from './pages/SkillsMarketPage';
 import PromptsMarketPage from './pages/PromptsMarketPage';
 import MyResourcesPage from './pages/MyResourcesPage';
@@ -49,6 +50,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         <Route path="/" element={<Layout><HomePage /></Layout>} />
+        <Route path="/search" element={<Layout><SearchPage /></Layout>} />
         <Route path="/skills" element={<SkillsMarketPage />} />
         <Route path="/skills/:id" element={<SkillDetailPage />} />
         <Route path="/skills/:id/preview" element={<SkillPreviewPage />} />

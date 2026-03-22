@@ -5,6 +5,8 @@ import { generateAccessToken, generateRefreshToken, verifyToken } from '../utils
 import { AuthRequest } from '../middleware/auth';
 import { validationResult } from 'express-validator';
 import { createLogger } from '../utils/logger';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { MAX_LOGIN_ATTEMPTS, LOCK_TIME } from '../models/User';
 
 const logger = createLogger('authController');
 
@@ -21,14 +23,23 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
 
     const { username, email, password } = req.body;
 
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) {
-      logger.warn('User already exists', { email, username, existingId: existingUser._id });
-      res.status(400).json({ error: 'User already exists' });
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
+      logger.warn('Email already registered', { email, existingId: existingEmail._id });
+      const error = createErrorResponse(ErrorCode.EMAIL_TAKEN);
+      res.status(error.statusCode).json(error);
       return;
     }
 
-    const user = new User({ username, email, password });
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      logger.warn('Username already taken', { username, existingId: existingUsername._id });
+      const error = createErrorResponse(ErrorCode.USERNAME_TAKEN);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    const user = new User({ username, email: email.toLowerCase(), password });
     await user.save();
 
     const token = generateAccessToken(user);
@@ -46,9 +57,25 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
       token,
       refreshToken,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      logger.warn('Duplicate key error on registration', { field, email: req.body.email, username: req.body.username });
+      
+      if (field === 'email') {
+        const err = createErrorResponse(ErrorCode.EMAIL_TAKEN);
+        res.status(err.statusCode).json(err);
+        return;
+      } else if (field === 'username') {
+        const err = createErrorResponse(ErrorCode.USERNAME_TAKEN);
+        res.status(err.statusCode).json(err);
+        return;
+      }
+    }
+    
     logger.error('Registration failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, email: req.body.email });
-    res.status(500).json({ error: 'Registration failed' });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -64,11 +91,21 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     const { email, password } = req.body;
+    const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       logger.warn('Login failed - user not found', { email });
-      res.status(401).json({ error: 'Invalid credentials' });
+      const error = createErrorResponse(ErrorCode.INVALID_CREDENTIALS);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    if (user.isLocked()) {
+      const remainingTime = user.lockUntil ? Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000) : 15;
+      logger.warn('Login failed - account locked', { userId: user._id, email, remainingTime });
+      const error = createErrorResponse(ErrorCode.ACCOUNT_LOCKED, { remainingTime });
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -80,10 +117,10 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
         
         if (!isEnterpriseAdmin) {
           logger.warn('Login failed - password login disabled for enterprise', { userId: user._id, enterpriseId: user.enterpriseId });
-          res.status(403).json({ 
-            error: 'PASSWORD_LOGIN_DISABLED',
+          const error = createErrorResponse(ErrorCode.FORBIDDEN, { 
             message: 'Password login is disabled for this enterprise. Please use SSO/OAuth to login.' 
           });
+          res.status(error.statusCode).json(error);
           return;
         }
       }
@@ -91,15 +128,30 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      logger.warn('Login failed - invalid password', { userId: user._id, email });
-      res.status(401).json({ error: 'Invalid credentials' });
+      await user.incLoginAttempts();
+      const attemptsLeft = MAX_LOGIN_ATTEMPTS - user.loginAttempts;
+      logger.warn('Login failed - invalid password', { userId: user._id, email, attemptsLeft });
+      
+      if (attemptsLeft <= 0) {
+        const error = createErrorResponse(ErrorCode.ACCOUNT_LOCKED, { remainingTime: 15 });
+        res.status(error.statusCode).json(error);
+        return;
+      }
+      
+      const error = createErrorResponse(ErrorCode.INVALID_CREDENTIALS, { attemptsLeft });
+      res.status(error.statusCode).json(error);
       return;
     }
+
+    await user.resetLoginAttempts();
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = clientIp;
+    await user.save();
 
     const token = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    logger.info('User logged in successfully', { userId: user._id, email: user.email, username: user.username });
+    logger.info('User logged in successfully', { userId: user._id, email: user.email, username: user.username, ip: clientIp });
 
     res.json({
       user: {
@@ -115,7 +167,8 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     });
   } catch (error) {
     logger.error('Login failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, email: req.body.email });
-    res.status(500).json({ error: 'Login failed' });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -124,7 +177,8 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
     const { refreshToken } = req.body;
     if (!refreshToken) {
       logger.warn('Refresh token missing');
-      res.status(400).json({ error: 'Refresh token required' });
+      const error = createErrorResponse(ErrorCode.TOKEN_MISSING);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -132,7 +186,8 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
     const user = await User.findById(payload.userId);
     if (!user) {
       logger.warn('Refresh token failed - user not found', { userId: payload.userId });
-      res.status(401).json({ error: 'User not found' });
+      const error = createErrorResponse(ErrorCode.USER_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -144,7 +199,8 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
     res.json({ token: newToken, refreshToken: newRefreshToken });
   } catch (error) {
     logger.error('Refresh token failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
-    res.status(401).json({ error: 'Invalid refresh token' });
+    const err = createErrorResponse(ErrorCode.TOKEN_INVALID);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -158,13 +214,15 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
     const user = await User.findById(req.user?.userId).select('-password');
     if (!user) {
       logger.warn('Get user failed - user not found', { userId: req.user?.userId });
-      res.status(404).json({ error: 'User not found' });
+      const error = createErrorResponse(ErrorCode.USER_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
     logger.debug('Get user info', { userId: user._id });
     res.json(user);
   } catch (error) {
     logger.error('Get user failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
-    res.status(500).json({ error: 'Failed to get user' });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };

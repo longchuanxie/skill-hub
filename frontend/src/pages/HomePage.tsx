@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { homeApi, HomeStats } from '../api/market';
 import CommunityTrends from '../components/CommunityTrends';
+import { RecommendationSection } from '../components/recommendation/RecommendationSection';
 
 const HomePage = () => {
   const { t } = useTranslation();
@@ -123,6 +124,33 @@ const HomePage = () => {
 
         <div className="mb-16">
           <CommunityTrends />
+        </div>
+
+        <div className="mb-16">
+          <RecommendationSection
+            title="热门技能"
+            type="popular"
+            resourceType="skill"
+            limit={8}
+          />
+        </div>
+
+        <div className="mb-16">
+          <RecommendationSection
+            title="热门提示词"
+            type="popular"
+            resourceType="prompt"
+            limit={8}
+          />
+        </div>
+
+        <div className="mb-16">
+          <RecommendationSection
+            title="新品推荐"
+            type="new"
+            resourceType="skill"
+            limit={8}
+          />
         </div>
 
         <div className="bg-gradient-to-r from-black to-gray-800 rounded-2xl p-12 mb-16">

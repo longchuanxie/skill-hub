@@ -31,6 +31,8 @@ import versionsRoutes from './routes/versions';
 import docsRoutes from './routes/docs';
 import permissionsRoutes from './routes/permissions';
 import rateLimitRoutes from './routes/rateLimits';
+import searchRoutes from './routes/search';
+import recommendationRoutes from './routes/recommendations';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
@@ -104,6 +106,8 @@ app.use('/api/custom-pages', customPagesRoutes);
 app.use('/api/versions', versionsRoutes);
 app.use('/api', permissionsRoutes);
 app.use('/api/rate-limit', rateLimitRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/recommendations', recommendationRoutes);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Not Found' });

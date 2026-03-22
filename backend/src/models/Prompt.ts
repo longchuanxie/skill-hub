@@ -122,7 +122,18 @@ const promptSchema = new Schema<IPrompt>({
   timestamps: true,
 });
 
-promptSchema.index({ name: 'text', description: 'text', content: 'text' });
+promptSchema.index(
+  { name: 'text', tags: 'text', description: 'text', content: 'text' },
+  {
+    weights: {
+      name: 10,
+      tags: 5,
+      description: 3,
+      content: 1
+    },
+    name: 'prompt_text_search_index'
+  }
+);
 promptSchema.index({ category: 1 });
 promptSchema.index({ owner: 1 });
 promptSchema.index({ enterpriseId: 1 });

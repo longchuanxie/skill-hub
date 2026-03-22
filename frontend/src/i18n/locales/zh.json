@@ -16,7 +16,8 @@
     "all": "全部",
     "none": "无",
     "yes": "是",
-    "no": "否"
+    "no": "否",
+    "readOnly": "只读"
   },
   "nav": {
     "home": "首页",
@@ -73,7 +74,20 @@
     "creatingAccount": "创建账号中...",
     "createAccount": "创建账号",
     "usernamePlaceholder": "请输入用户名",
-    "passwordMinLength": "密码至少需要6个字符"
+    "passwordMinLength": "密码至少需要8个字符",
+    "forgotPassword": "忘记密码",
+    "forgotPasswordDesc": "输入您的邮箱地址以重置密码",
+    "checkYourEmail": "请查收邮件",
+    "resetLinkSent": "密码重置链接已发送到您的邮箱地址。",
+    "backToLogin": "返回登录",
+    "sending": "发送中...",
+    "sendResetLink": "发送重置链接",
+    "resetPassword": "重置密码",
+    "resetPasswordSuccess": "密码重置成功",
+    "resetPasswordRedirect": "密码已重置，正在跳转到登录页面...",
+    "invalidResetLink": "无效的重置链接",
+    "expiredResetLink": "重置链接已过期，请重新申请",
+    "passwordRequirements": "密码要求："
   },
   "skills": {
     "title": "技能",
@@ -350,7 +364,13 @@
     },
     "visibilityOptions": {
       "private": "私有",
-      "public": "公开"
+      "privateDesc": "仅自己可见",
+      "enterprise": "企业",
+      "enterpriseDesc": "企业内部成员可见",
+      "shared": "协作共享",
+      "sharedDesc": "仅所有者和协作者可见",
+      "public": "公开",
+      "publicDesc": "所有人可见"
     },
     "statusOptions": {
       "draft": "草稿",
@@ -364,12 +384,15 @@
     "skillFileOptional": "可选：上传包含技能包的ZIP文件（公开技能必需）",
     "fileTree": "文件预览",
     "fileList": "文件列表",
+    "existingFiles": "现有文件",
     "saveDraft": "保存草稿",
     "submitForApproval": "提交审核",
     "saving": "保存中...",
     "submitting": "提交中...",
     "parseFailed": "解析ZIP文件失败",
     "fileSaved": "文件已保存",
+    "reviewPassed": "审核通过，资源已发布",
+    "reviewFailed": "审核未通过",
     "error": {
       "requiredFields": "请填写所有必填字段",
       "uploadFailed": "上传失败"
@@ -448,7 +471,38 @@
     "INTERNAL_SERVER_ERROR": "服务器内部错误",
     "DATABASE_ERROR": "数据库错误",
     "FILE_UPLOAD_ERROR": "文件上传失败",
-    "FILE_PROCESS_ERROR": "文件处理失败"
+    "FILE_PROCESS_ERROR": "文件处理失败",
+    "TOKEN_MISSING": "缺少认证令牌",
+    "INVALID_CREDENTIALS": "邮箱或密码错误",
+    "INVALID_VERIFICATION_TOKEN": "验证令牌无效",
+    "READ_PERMISSION_DENIED": "读取权限被拒绝",
+    "SKILL_VERSION_NOT_FOUND": "技能版本不存在",
+    "PROMPT_VERSION_NOT_FOUND": "提示词版本不存在",
+    "ENTERPRISE_NOT_FOUND": "企业不存在",
+    "UPDATE_DESCRIPTION_REQUIRED": "更新说明必填",
+    "SKILL_NAME_EXISTS_BY_OTHER": "同名技能已被其他用户使用",
+    "PROMPT_NAME_EXISTS_BY_OTHER": "同名提示词已被其他用户使用",
+    "USERNAME_TAKEN": "用户名已被使用",
+    "EMAIL_TAKEN": "邮箱已被注册",
+    "NO_FILE_UPLOADED": "未上传文件",
+    "EMAIL_SEND_FAILED": "邮件发送失败",
+    "ACCOUNT_LOCKED": "账户已被锁定，请稍后再试",
+    "PASSWORD_RESET_TOKEN_INVALID": "密码重置令牌无效",
+    "PASSWORD_RESET_TOKEN_EXPIRED": "密码重置令牌已过期",
+    "VERIFICATION_CODE_INVALID": "验证码无效",
+    "VERIFICATION_CODE_EXPIRED": "验证码已过期",
+    "passwordStrength": {
+      "title": "密码强度要求",
+      "minLength": "密码长度至少需要8个字符",
+      "maxLength": "密码长度不能超过128个字符",
+      "lowercase": "密码必须包含至少一个小写字母",
+      "uppercase": "密码必须包含至少一个大写字母",
+      "number": "密码必须包含至少一个数字",
+      "special": "密码必须包含至少一个特殊字符",
+      "common": "密码不能包含常见弱密码"
+    },
+    "loginLocked": "账户已被锁定，请在 {{minutes}} 分钟后重试",
+    "loginAttemptsLeft": "邮箱或密码错误，还剩 {{count}} 次尝试机会"
   },
   "success": {
     "saved": "保存成功",
@@ -552,9 +606,15 @@
     "currentVisibility": "当前可见性",
     "visibilityDescription": "控制谁可以访问此资源",
     "visibilityPublic": "公开",
+    "visibilityPublicDesc": "所有人可见",
     "visibilityPrivate": "私有",
-    "visibilityTeam": "团队",
+    "visibilityPrivateDesc": "仅自己可见",
+    "visibilityEnterprise": "企业",
+    "visibilityEnterpriseDesc": "企业内部成员可见",
+    "visibilityShared": "协作共享",
+    "visibilitySharedDesc": "仅所有者和协作者可见",
     "collaborators": "协作者",
+    "collaboratorsEnterpriseNote": "企业账号只能添加同企业成员为协作者",
     "searchUsers": "搜索用户...",
     "searchFailed": "搜索用户失败",
     "add": "添加",
@@ -570,6 +630,15 @@
     "roleUpdated": "角色更新成功",
     "updateRoleFailed": "更新角色失败",
     "visibilityUpdated": "可见性更新成功",
-    "updateVisibilityFailed": "更新可见性失败"
+    "updateVisibilityFailed": "更新可见性失败",
+    "enterpriseCollaboratorOnly": "协作者必须来自同一企业"
+  },
+  "preview": {
+    "title": "文档预览",
+    "selectFileToPreview": "选择文件进行预览",
+    "imagePreviewNotAvailable": "图片预览暂不可用",
+    "searchFiles": "搜索文件...",
+    "allTypes": "全部类型",
+    "noFilesFound": "没有找到文件"
   }
 }

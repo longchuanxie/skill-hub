@@ -38,6 +38,8 @@ const PromptEditPage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const hasEnterprise = !!user?.enterpriseId;
+
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -266,9 +268,19 @@ const PromptEditPage: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="private">{t('upload.visibilityOptions.private')}</SelectItem>
+                {hasEnterprise && (
+                  <SelectItem value="enterprise">{t('upload.visibilityOptions.enterprise')}</SelectItem>
+                )}
+                <SelectItem value="shared">{t('upload.visibilityOptions.shared')}</SelectItem>
                 <SelectItem value="public">{t('upload.visibilityOptions.public')}</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              {form.visibility === 'private' && t('upload.visibilityOptions.privateDesc')}
+              {form.visibility === 'public' && t('upload.visibilityOptions.publicDesc')}
+              {form.visibility === 'enterprise' && t('upload.visibilityOptions.enterpriseDesc')}
+              {form.visibility === 'shared' && t('upload.visibilityOptions.sharedDesc')}
+            </p>
           </div>
 
           <div>
@@ -278,17 +290,20 @@ const PromptEditPage: React.FC = () => {
               </svg>
               {t('upload.status')}
             </label>
-            <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={t('upload.placeholder.status')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">{t('upload.statusOptions.draft')}</SelectItem>
-                <SelectItem value="pending">{t('upload.statusOptions.pending')}</SelectItem>
-                <SelectItem value="approved">{t('upload.statusOptions.approved')}</SelectItem>
-                <SelectItem value="rejected">{t('upload.statusOptions.rejected')}</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+                form.status === 'approved' ? 'bg-green-100 text-green-800' :
+                form.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                form.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {form.status === 'draft' ? t('upload.statusOptions.draft') :
+                 form.status === 'pending' ? t('upload.statusOptions.pending') :
+                 form.status === 'approved' ? t('upload.statusOptions.approved') :
+                 form.status === 'rejected' ? t('upload.statusOptions.rejected') : form.status}
+              </span>
+              <span className="text-xs text-gray-500">({t('common.readOnly') || '只读'})</span>
+            </div>
           </div>
 
           <div>

@@ -16,7 +16,8 @@
     "all": "All",
     "none": "None",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "readOnly": "Read Only"
   },
   "nav": {
     "home": "Home",
@@ -73,7 +74,18 @@
     "creatingAccount": "Creating account...",
     "createAccount": "Create Account",
     "usernamePlaceholder": "Enter your username",
-    "passwordMinLength": "Password must be at least 6 characters"
+    "passwordMinLength": "Password must be at least 8 characters",
+    "forgotPasswordDesc": "Enter your email to reset your password",
+    "checkYourEmail": "Check your email",
+    "resetLinkSent": "We've sent a password reset link to your email address.",
+    "backToLogin": "Back to login",
+    "sending": "Sending...",
+    "sendResetLink": "Send Reset Link",
+    "resetPasswordSuccess": "Password Reset Successful",
+    "resetPasswordRedirect": "Your password has been reset. Redirecting to login...",
+    "invalidResetLink": "Invalid reset link",
+    "expiredResetLink": "Reset link has expired, please request a new one",
+    "passwordRequirements": "Password requirements:"
   },
   "skills": {
     "title": "Skills",
@@ -350,7 +362,13 @@
     },
     "visibilityOptions": {
       "private": "Private",
-      "public": "Public"
+      "privateDesc": "Only visible to you",
+      "enterprise": "Enterprise",
+      "enterpriseDesc": "Visible to enterprise members",
+      "shared": "Collaborative",
+      "sharedDesc": "Only visible to owner and collaborators",
+      "public": "Public",
+      "publicDesc": "Visible to everyone"
     },
     "statusOptions": {
       "draft": "Draft",
@@ -364,12 +382,15 @@
     "skillFileOptional": "Optional: Upload a ZIP file containing your skill package (required for public skills)",
     "fileTree": "File Preview",
     "fileList": "Files",
+    "existingFiles": "Existing Files",
     "saveDraft": "Save as Draft",
     "submitForApproval": "Submit for Approval",
     "saving": "Saving...",
     "submitting": "Submitting...",
     "parseFailed": "Failed to parse ZIP file",
     "fileSaved": "File saved",
+    "reviewPassed": "Review passed, resource published",
+    "reviewFailed": "Review failed",
     "error": {
       "requiredFields": "Please fill in all required fields",
       "uploadFailed": "Upload failed"
@@ -448,7 +469,38 @@
     "INTERNAL_SERVER_ERROR": "Internal server error",
     "DATABASE_ERROR": "Database error",
     "FILE_UPLOAD_ERROR": "File upload failed",
-    "FILE_PROCESS_ERROR": "File processing failed"
+    "FILE_PROCESS_ERROR": "File processing failed",
+    "TOKEN_MISSING": "Authentication token is missing",
+    "INVALID_CREDENTIALS": "Invalid email or password",
+    "INVALID_VERIFICATION_TOKEN": "Invalid verification token",
+    "READ_PERMISSION_DENIED": "Read permission denied",
+    "SKILL_VERSION_NOT_FOUND": "Skill version not found",
+    "PROMPT_VERSION_NOT_FOUND": "Prompt version not found",
+    "ENTERPRISE_NOT_FOUND": "Enterprise not found",
+    "UPDATE_DESCRIPTION_REQUIRED": "Update description is required",
+    "SKILL_NAME_EXISTS_BY_OTHER": "Skill name already taken by another user",
+    "PROMPT_NAME_EXISTS_BY_OTHER": "Prompt name already taken by another user",
+    "USERNAME_TAKEN": "Username already taken",
+    "EMAIL_TAKEN": "Email already registered",
+    "NO_FILE_UPLOADED": "No file uploaded",
+    "EMAIL_SEND_FAILED": "Failed to send email",
+    "ACCOUNT_LOCKED": "Account is locked, please try again later",
+    "PASSWORD_RESET_TOKEN_INVALID": "Invalid password reset token",
+    "PASSWORD_RESET_TOKEN_EXPIRED": "Password reset token has expired",
+    "VERIFICATION_CODE_INVALID": "Invalid verification code",
+    "VERIFICATION_CODE_EXPIRED": "Verification code has expired",
+    "passwordStrength": {
+      "title": "Password Strength Requirements",
+      "minLength": "Password must be at least 8 characters",
+      "maxLength": "Password must not exceed 128 characters",
+      "lowercase": "Password must contain at least one lowercase letter",
+      "uppercase": "Password must contain at least one uppercase letter",
+      "number": "Password must contain at least one number",
+      "special": "Password must contain at least one special character",
+      "common": "Password cannot contain common weak passwords"
+    },
+    "loginLocked": "Account is locked, please try again in {{minutes}} minutes",
+    "loginAttemptsLeft": "Invalid email or password, {{count}} attempts remaining"
   },
   "success": {
     "saved": "Saved successfully",
@@ -552,9 +604,15 @@
     "currentVisibility": "Current Visibility",
     "visibilityDescription": "Control who can access this resource",
     "visibilityPublic": "Public",
+    "visibilityPublicDesc": "Visible to everyone",
     "visibilityPrivate": "Private",
-    "visibilityTeam": "Team",
+    "visibilityPrivateDesc": "Only visible to you",
+    "visibilityEnterprise": "Enterprise",
+    "visibilityEnterpriseDesc": "Visible to enterprise members",
+    "visibilityShared": "Collaborative",
+    "visibilitySharedDesc": "Only visible to owner and collaborators",
     "collaborators": "Collaborators",
+    "collaboratorsEnterpriseNote": "Enterprise accounts can only add members from the same enterprise as collaborators",
     "searchUsers": "Search users...",
     "searchFailed": "Search users failed",
     "add": "Add",
@@ -570,6 +628,15 @@
     "roleUpdated": "Role updated successfully",
     "updateRoleFailed": "Update role failed",
     "visibilityUpdated": "Visibility updated successfully",
-    "updateVisibilityFailed": "Update visibility failed"
+    "updateVisibilityFailed": "Update visibility failed",
+    "enterpriseCollaboratorOnly": "Collaborators must be from the same enterprise"
+  },
+  "preview": {
+    "title": "Document Preview",
+    "selectFileToPreview": "Select a file to preview",
+    "imagePreviewNotAvailable": "Image preview not available",
+    "searchFiles": "Search files...",
+    "allTypes": "All Types",
+    "noFilesFound": "No files found"
   }
 }

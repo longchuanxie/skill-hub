@@ -131,7 +131,17 @@ const skillSchema = new Schema<ISkill>({
   timestamps: true,
 });
 
-skillSchema.index({ name: 'text', description: 'text', tags: 'text' });
+skillSchema.index(
+  { name: 'text', tags: 'text', description: 'text' },
+  {
+    weights: {
+      name: 10,
+      tags: 5,
+      description: 2
+    },
+    name: 'skill_text_search_index'
+  }
+);
 skillSchema.index({ category: 1 });
 skillSchema.index({ owner: 1 });
 skillSchema.index({ enterpriseId: 1 });

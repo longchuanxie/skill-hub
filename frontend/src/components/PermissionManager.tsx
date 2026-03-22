@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { permissionsApi, SkillPermissions, Visibility } from '../api/permissions';
+import { userApi } from '../api/user';
+import { useAuthStore } from '../stores/authStore';
 import { toast } from 'sonner';
 
 interface PermissionManagerProps {
@@ -23,12 +25,15 @@ interface User {
 
 const PermissionManager: React.FC<PermissionManagerProps> = ({ skillId }) => {
   const { t } = useTranslation();
+  const { user } = useAuthStore();
   const [permissions, setPermissions] = useState<SkillPermissions | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
   const [updating, setUpdating] = useState(false);
+
+  const hasEnterprise = !!user?.enterpriseId;
 
   useEffect(() => {
     loadPermissions();
@@ -55,12 +60,9 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({ skillId }) => {
 
     try {
       setSearching(true);
-      const mockUsers: User[] = [
-        { _id: '1', username: 'testuser1', email: 'test1@example.com' },
-        { _id: '2', username: 'testuser2', email: 'test2@example.com' },
-      ];
+      const { users } = await userApi.searchUsers(query);
       const existingUserIds = permissions?.collaborators.map(c => c.userId) || [];
-      const filteredUsers = mockUsers.filter((u: User) => !existingUserIds.includes(u._id));
+      const filteredUsers = users.filter((u: User) => !existingUserIds.includes(u._id));
       setSearchResults(filteredUsers);
     } catch (error) {
       toast.error(t('permissions.searchFailed'));
@@ -79,8 +81,13 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({ skillId }) => {
       setSearchQuery('');
       setSearchResults([]);
       toast.success(t('permissions.collaboratorAdded'));
-    } catch (error) {
-      toast.error(t('permissions.addCollaboratorFailed'));
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error || error?.message || '';
+      if (errorMessage.includes('same enterprise')) {
+        toast.error(t('permissions.enterpriseCollaboratorOnly'));
+      } else {
+        toast.error(t('permissions.addCollaboratorFailed'));
+      }
     } finally {
       setUpdating(false);
     }
@@ -150,8 +157,10 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({ skillId }) => {
         return <Badge variant="default">{t('permissions.visibilityPublic')}</Badge>;
       case 'private':
         return <Badge variant="destructive">{t('permissions.visibilityPrivate')}</Badge>;
-      case 'team':
-        return <Badge variant="secondary">{t('permissions.visibilityTeam')}</Badge>;
+      case 'enterprise':
+        return <Badge variant="secondary">{t('permissions.visibilityEnterprise')}</Badge>;
+      case 'shared':
+        return <Badge variant="outline">{t('permissions.visibilityShared')}</Badge>;
       default:
         return <Badge>{visibility}</Badge>;
     }
@@ -188,12 +197,39 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({ skillId }) => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="private">{t('permissions.visibilityPrivate')}</SelectItem>
-                  <SelectItem value="team">{t('permissions.visibilityTeam')}</SelectItem>
-                  <SelectItem value="public">{t('permissions.visibilityPublic')}</SelectItem>
+                  <SelectItem value="private">
+                    <div className="flex flex-col">
+                      <span>{t('permissions.visibilityPrivate')}</span>
+                    </div>
+                  </SelectItem>
+                  {hasEnterprise && (
+                    <SelectItem value="enterprise">
+                      <div className="flex flex-col">
+                        <span>{t('permissions.visibilityEnterprise')}</span>
+                      </div>
+                    </SelectItem>
+                  )}
+                  <SelectItem value="shared">
+                    <div className="flex flex-col">
+                      <span>{t('permissions.visibilityShared')}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="public">
+                    <div className="flex flex-col">
+                      <span>{t('permissions.visibilityPublic')}</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600">
+              {permissions?.visibility === 'private' && t('permissions.visibilityPrivateDesc')}
+              {permissions?.visibility === 'public' && t('permissions.visibilityPublicDesc')}
+              {permissions?.visibility === 'enterprise' && t('permissions.visibilityEnterpriseDesc')}
+              {permissions?.visibility === 'shared' && t('permissions.visibilitySharedDesc')}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -204,6 +240,14 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({ skillId }) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {hasEnterprise && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <span className="font-medium">提示：</span>
+                  {t('permissions.collaboratorsEnterpriseNote')}
+                </p>
+              </div>
+            )}
             <div className="relative">
               <Input
                 placeholder={t('permissions.searchUsers')}

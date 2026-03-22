@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '@/components/ui/button';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { SearchBar } from './search/SearchBar';
 
 interface LayoutProps {
   children: ReactNode;
@@ -49,8 +50,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     {t('nav.myResources')}
                   </Link>
                 )}
-                <Link 
-                  to="/agents" 
+                <Link
+                  to="/agents"
                   className="flex items-center gap-1.5 text-gray-600 hover:text-black font-medium transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,6 +63,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
 
             <div className="flex items-center space-x-4">
+              <div className="w-64">
+                <SearchBar placeholder="搜索技能、提示词..." />
+              </div>
               <LanguageSwitcher />
               {isAuthenticated && user ? (
                 <div className="flex items-center space-x-4">

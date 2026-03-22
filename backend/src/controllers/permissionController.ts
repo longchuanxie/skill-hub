@@ -4,34 +4,31 @@ import { SkillPermissions } from '../models/SkillPermissions';
 import { PermissionAuditLog } from '../models/PermissionAuditLog';
 import { Skill } from '../models/Skill';
 import { User } from '../models/User';
-import bcrypt from 'bcryptjs';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('PermissionController');
 
 export const getPermissions = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { skillId } = req.params;
 
     if (!req.user?.userId) {
-      res.status(401).json({
-        success: false,
-        error: 'Unauthorized'
-      });
+      const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({
-        success: false,
-        error: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user.userId) {
-      res.status(403).json({
-        success: false,
-        error: 'Not authorized to view permissions'
-      });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -52,11 +49,9 @@ export const getPermissions = async (req: AuthRequest, res: Response): Promise<v
       data: permissions
     });
   } catch (error) {
-    console.error('Get permissions error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch permissions'
-    });
+    logger.error('Get permissions error', { error: error instanceof Error ? error.message : String(error) });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -66,27 +61,21 @@ export const updatePermissions = async (req: AuthRequest, res: Response): Promis
     const { visibility, password, allowComments, allowForks } = req.body;
 
     if (!req.user?.userId) {
-      res.status(401).json({
-        success: false,
-        error: 'Unauthorized'
-      });
+      const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({
-        success: false,
-        error: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user.userId) {
-      res.status(403).json({
-        success: false,
-        error: 'Not authorized to update permissions'
-      });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -100,13 +89,6 @@ export const updatePermissions = async (req: AuthRequest, res: Response): Promis
     if (visibility) permissions.visibility = visibility;
     if (allowComments !== undefined) permissions.allowComments = allowComments;
     if (allowForks !== undefined) permissions.allowForks = allowForks;
-
-    if (visibility === 'password-protected' && password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      permissions.password = hashedPassword;
-    } else if (visibility !== 'password-protected') {
-      permissions.password = undefined;
-    }
 
     await permissions.save();
 
@@ -124,11 +106,9 @@ export const updatePermissions = async (req: AuthRequest, res: Response): Promis
       data: permissions
     });
   } catch (error) {
-    console.error('Update permissions error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update permissions'
-    });
+    logger.error('Update permissions error', { error: error instanceof Error ? error.message : String(error) });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -138,45 +118,44 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
     const { userId, role } = req.body;
 
     if (!req.user?.userId) {
-      res.status(401).json({
-        success: false,
-        error: 'Unauthorized'
-      });
+      const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({
-        success: false,
-        error: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user.userId) {
-      res.status(403).json({
-        success: false,
-        error: 'Not authorized to add collaborator'
-      });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) === userId) {
-      res.status(400).json({
-        success: false,
-        error: 'Cannot add owner as collaborator'
-      });
+      const error = createErrorResponse(ErrorCode.OPERATION_NOT_ALLOWED, 'Cannot add owner as collaborator');
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
+      const error = createErrorResponse(ErrorCode.USER_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
+    }
+
+    const owner = await User.findById(req.user.userId);
+    if (owner?.enterpriseId) {
+      if (!user.enterpriseId || String(user.enterpriseId) !== String(owner.enterpriseId)) {
+        const error = createErrorResponse(ErrorCode.ACCESS_DENIED, 'Collaborators must be from the same enterprise');
+        res.status(error.statusCode).json(error);
+        return;
+      }
     }
 
     let permissions = await SkillPermissions.findOne({ skillId });
@@ -189,10 +168,8 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
     );
 
     if (existingCollaborator) {
-      res.status(400).json({
-        success: false,
-        error: 'User is already a collaborator'
-      });
+      const error = createErrorResponse(ErrorCode.DUPLICATE_RESOURCE, 'User is already a collaborator');
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -218,11 +195,9 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
       data: permissions
     });
   } catch (error) {
-    console.error('Add collaborator error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to add collaborator'
-    });
+    logger.error('Add collaborator error', { error: error instanceof Error ? error.message : String(error) });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -232,36 +207,28 @@ export const updateCollaboratorPermission = async (req: AuthRequest, res: Respon
     const { role } = req.body;
 
     if (!req.user?.userId) {
-      res.status(401).json({
-        success: false,
-        error: 'Unauthorized'
-      });
+      const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({
-        success: false,
-        error: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user.userId) {
-      res.status(403).json({
-        success: false,
-        error: 'Not authorized to update collaborator'
-      });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const permissions = await SkillPermissions.findOne({ skillId });
     if (!permissions) {
-      res.status(404).json({
-        success: false,
-        error: 'Permissions not found'
-      });
+      const error = createErrorResponse(ErrorCode.RESOURCE_NOT_FOUND, 'Permissions not found');
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -270,10 +237,8 @@ export const updateCollaboratorPermission = async (req: AuthRequest, res: Respon
     );
 
     if (!collaborator) {
-      res.status(404).json({
-        success: false,
-        error: 'Collaborator not found'
-      });
+      const error = createErrorResponse(ErrorCode.USER_NOT_FOUND, 'Collaborator not found');
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -294,11 +259,9 @@ export const updateCollaboratorPermission = async (req: AuthRequest, res: Respon
       data: permissions
     });
   } catch (error) {
-    console.error('Update collaborator error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update collaborator'
-    });
+    logger.error('Update collaborator error', { error: error instanceof Error ? error.message : String(error) });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -307,36 +270,28 @@ export const removeCollaborator = async (req: AuthRequest, res: Response): Promi
     const { skillId, userId } = req.params;
 
     if (!req.user?.userId) {
-      res.status(401).json({
-        success: false,
-        error: 'Unauthorized'
-      });
+      const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({
-        success: false,
-        error: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user.userId) {
-      res.status(403).json({
-        success: false,
-        error: 'Not authorized to remove collaborator'
-      });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const permissions = await SkillPermissions.findOne({ skillId });
     if (!permissions) {
-      res.status(404).json({
-        success: false,
-        error: 'Permissions not found'
-      });
+      const error = createErrorResponse(ErrorCode.RESOURCE_NOT_FOUND, 'Permissions not found');
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -345,10 +300,8 @@ export const removeCollaborator = async (req: AuthRequest, res: Response): Promi
     );
 
     if (collaboratorIndex === -1) {
-      res.status(404).json({
-        success: false,
-        error: 'Collaborator not found'
-      });
+      const error = createErrorResponse(ErrorCode.USER_NOT_FOUND, 'Collaborator not found');
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -370,11 +323,9 @@ export const removeCollaborator = async (req: AuthRequest, res: Response): Promi
       data: permissions
     });
   } catch (error) {
-    console.error('Remove collaborator error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to remove collaborator'
-    });
+    logger.error('Remove collaborator error', { error: error instanceof Error ? error.message : String(error) });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -383,27 +334,21 @@ export const getPermissionAuditLogs = async (req: AuthRequest, res: Response): P
     const { skillId } = req.params;
 
     if (!req.user?.userId) {
-      res.status(401).json({
-        success: false,
-        error: 'Unauthorized'
-      });
+      const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({
-        success: false,
-        error: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     if (String(skill.owner) !== req.user.userId) {
-      res.status(403).json({
-        success: false,
-        error: 'Not authorized to view audit logs'
-      });
+      const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -416,11 +361,9 @@ export const getPermissionAuditLogs = async (req: AuthRequest, res: Response): P
       data: logs
     });
   } catch (error) {
-    console.error('Get audit logs error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch audit logs'
-    });
+    logger.error('Get audit logs error', { error: error instanceof Error ? error.message : String(error) });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -429,45 +372,79 @@ export const checkPermission = async (req: AuthRequest, res: Response): Promise<
     const { skillId } = req.params;
     const { permission } = req.query;
 
-    const skill = await Skill.findById(skillId);
+    const skill = await Skill.findById(skillId).populate('owner');
     if (!skill) {
-      res.status(404).json({
-        success: false,
-        error: 'Skill not found'
-      });
+      const error = createErrorResponse(ErrorCode.SKILL_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
     let hasPermission = false;
     let reason = '';
 
-    const isOwner = req.user?.userId && String(skill.owner) === req.user.userId;
+    const owner = skill.owner as any;
+    const isOwner = req.user?.userId && String(owner._id) === req.user.userId;
     const isPublic = skill.visibility === 'public';
+    const isShared = skill.visibility === 'shared';
+    const isEnterprise = skill.visibility === 'enterprise';
+
+    const ownerEnterpriseId = owner?.enterpriseId;
 
     if (permission === 'view') {
-      hasPermission = !!(isOwner || isPublic);
-      reason = isOwner ? 'User is owner' : isPublic ? 'Skill is public' : 'No access';
+      if (isOwner) {
+        hasPermission = true;
+        reason = 'User is owner';
+      } else if (isPublic) {
+        hasPermission = true;
+        reason = 'Skill is public';
+      } else if (isEnterprise && req.user?.userId) {
+        const currentUser = await User.findById(req.user.userId);
+        if (currentUser?.enterpriseId && String(currentUser.enterpriseId) === String(ownerEnterpriseId)) {
+          hasPermission = true;
+          reason = 'User is from same enterprise';
+        }
+      }
     } else if (permission === 'edit' || permission === 'delete' || permission === 'manage') {
-      hasPermission = !!isOwner;
-      reason = isOwner ? 'User is owner' : 'Not authorized';
+      if (isOwner) {
+        hasPermission = true;
+        reason = 'User is owner';
+      }
     }
 
-    if (!hasPermission && req.user?.userId) {
+    if (!hasPermission && req.user?.userId && (isShared || isEnterprise)) {
       const permissions = await SkillPermissions.findOne({ skillId });
       if (permissions) {
         const collaborator = permissions.collaborators.find(
           c => String(c.userId) === req.user?.userId
         );
         if (collaborator) {
-          if (permission === 'view') {
-            hasPermission = true;
-            reason = 'User is collaborator';
-          } else if (permission === 'edit' && (collaborator.role === 'editor' || collaborator.role === 'admin')) {
-            hasPermission = true;
-            reason = 'User is editor/admin';
-          } else if (permission === 'manage' && collaborator.role === 'admin') {
-            hasPermission = true;
-            reason = 'User is admin';
+          const currentUser = await User.findById(req.user.userId);
+          if (ownerEnterpriseId) {
+            if (!currentUser?.enterpriseId || String(currentUser.enterpriseId) !== String(ownerEnterpriseId)) {
+              reason = 'Collaborator must be from same enterprise';
+            } else {
+              if (permission === 'view') {
+                hasPermission = true;
+                reason = 'User is collaborator from same enterprise';
+              } else if (permission === 'edit' && (collaborator.role === 'editor' || collaborator.role === 'admin')) {
+                hasPermission = true;
+                reason = 'User is editor/admin from same enterprise';
+              } else if (permission === 'manage' && collaborator.role === 'admin') {
+                hasPermission = true;
+                reason = 'User is admin from same enterprise';
+              }
+            }
+          } else {
+            if (permission === 'view') {
+              hasPermission = true;
+              reason = 'User is collaborator';
+            } else if (permission === 'edit' && (collaborator.role === 'editor' || collaborator.role === 'admin')) {
+              hasPermission = true;
+              reason = 'User is editor/admin';
+            } else if (permission === 'manage' && collaborator.role === 'admin') {
+              hasPermission = true;
+              reason = 'User is admin';
+            }
           }
         }
       }
@@ -481,10 +458,8 @@ export const checkPermission = async (req: AuthRequest, res: Response): Promise<
       }
     });
   } catch (error) {
-    console.error('Check permission error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to check permission'
-    });
+    logger.error('Check permission error', { error: error instanceof Error ? error.message : String(error) });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };

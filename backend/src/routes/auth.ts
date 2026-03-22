@@ -19,6 +19,7 @@ import {
   changePasswordValidation
 } from '../validations/passwordValidation';
 import { publicApiLimiter } from '../middleware/rateLimit';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
 
 const router = Router();
 
@@ -38,7 +39,8 @@ router.post('/send-verification-email', authenticate, async (req: AuthRequest, r
   try {
     const user = await User.findById(req.user?.userId);
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      const error = createErrorResponse(ErrorCode.USER_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
     if (user.isEmailVerified) {
@@ -53,7 +55,8 @@ router.post('/send-verification-email', authenticate, async (req: AuthRequest, r
     console.log(`Email verification token for ${user.email}: ${token}`);
     res.json({ message: 'Verification email sent', expiresIn: 3600 });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to send verification email' });
+    const err = createErrorResponse(ErrorCode.EMAIL_SEND_FAILED);
+    res.status(err.statusCode).json(err);
   }
 });
 
@@ -63,7 +66,8 @@ router.get('/verify-email/:token', async (req: AuthRequest, res: Response) => {
     const user = await User.findOne({ emailVerificationToken: token });
     
     if (!user) {
-      res.status(400).json({ error: 'Invalid verification token' });
+      const error = createErrorResponse(ErrorCode.INVALID_VERIFICATION_TOKEN);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -73,7 +77,8 @@ router.get('/verify-email/:token', async (req: AuthRequest, res: Response) => {
 
     res.json({ message: 'Email verified successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to verify email' });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 });
 

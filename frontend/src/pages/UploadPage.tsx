@@ -12,6 +12,7 @@ import { skillApi, promptApi } from '../api/market';
 import { parseSkillZip, SkillMetadata, FileTreeNode, isTextFile, getFileIcon, updateFileContent } from '../utils/skillParser';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useAuthStore } from '../stores/authStore';
 
 interface FileEditorState {
   path: string;
@@ -23,11 +24,14 @@ const UploadPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { getErrorMessage } = useErrorHandler();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('skill');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [parsing, setParsing] = useState(false);
+
+  const hasEnterprise = !!user?.enterpriseId;
 
   const [skillForm, setSkillForm] = useState({
     name: '',
@@ -160,7 +164,7 @@ const UploadPage: React.FC = () => {
     setSuccess('');
 
     try {
-      await skillApi.createSkill({
+      const response = await skillApi.createSkill({
         name: skillForm.name || undefined,
         description: skillForm.description,
         updateDescription: skillForm.updateDescription || undefined,
@@ -171,8 +175,19 @@ const UploadPage: React.FC = () => {
         author: skillForm.author || undefined,
         compatibility: skillForm.compatibility.split(',').map((c) => c.trim()).filter(Boolean),
         file: skillFile,
-      });
-      setSuccess(t('upload.success'));
+      }) as any;
+      
+      if (status === 'approved' && response.autoReviewResult) {
+        if (response.autoReviewResult.passed) {
+          setSuccess(t('upload.reviewPassed') || '审核通过，技能已发布');
+        } else {
+          setError(`${t('upload.reviewFailed') || '审核未通过'}: ${response.autoReviewResult.issues?.join(', ') || '未知原因'}`);
+          return;
+        }
+      } else {
+        setSuccess(t('upload.success'));
+      }
+      
       setSkillForm({
         name: '',
         description: '',
@@ -195,9 +210,15 @@ const UploadPage: React.FC = () => {
     }
   };
 
-  const handlePromptSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePromptDraft = async () => {
+    await handlePromptSubmit('draft');
+  };
 
+  const handlePromptApprove = async () => {
+    await handlePromptSubmit('approved');
+  };
+
+  const handlePromptSubmit = async (status: 'draft' | 'approved') => {
     if (!promptForm.name.trim() || !promptForm.description.trim() || !promptForm.content.trim()) {
       setError(t('upload.error.requiredFields'));
       return;
@@ -208,17 +229,28 @@ const UploadPage: React.FC = () => {
     setSuccess('');
 
     try {
-      await promptApi.createPrompt({
+      const response = await promptApi.createPrompt({
         name: promptForm.name,
         description: promptForm.description,
         category: promptForm.category,
         visibility: promptForm.visibility,
-        status: promptForm.status,
+        status,
         content: promptForm.content,
         updateDescription: promptForm.updateDescription || undefined,
         tags: promptForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
-      });
-      setSuccess(t('upload.success'));
+      }) as any;
+      
+      if (status === 'approved' && response.autoReviewResult) {
+        if (response.autoReviewResult.passed) {
+          setSuccess(t('upload.reviewPassed') || '审核通过，提示词已发布');
+        } else {
+          setError(`${t('upload.reviewFailed') || '审核未通过'}: ${response.autoReviewResult.issues?.join(', ') || '未知原因'}`);
+          return;
+        }
+      } else {
+        setSuccess(t('upload.success'));
+      }
+      
       setPromptForm({
         name: '',
         description: '',
@@ -478,9 +510,19 @@ const UploadPage: React.FC = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="private">{t('upload.visibilityOptions.private') || '私有'}</SelectItem>
+                          {hasEnterprise && (
+                            <SelectItem value="enterprise">{t('upload.visibilityOptions.enterprise') || '企业'}</SelectItem>
+                          )}
+                          <SelectItem value="shared">{t('upload.visibilityOptions.shared') || '协作共享'}</SelectItem>
                           <SelectItem value="public">{t('upload.visibilityOptions.public') || '公开'}</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {skillForm.visibility === 'private' && (t('upload.visibilityOptions.privateDesc') || '仅自己可见')}
+                        {skillForm.visibility === 'public' && (t('upload.visibilityOptions.publicDesc') || '所有人可见')}
+                        {skillForm.visibility === 'enterprise' && (t('upload.visibilityOptions.enterpriseDesc') || '企业内部成员可见')}
+                        {skillForm.visibility === 'shared' && (t('upload.visibilityOptions.sharedDesc') || '仅所有者和协作者可见')}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -576,7 +618,7 @@ const UploadPage: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="prompt">
-            <form onSubmit={handlePromptSubmit} className="space-y-6 max-w-2xl mx-auto" noValidate>
+            <div className="space-y-6 max-w-2xl mx-auto">
               {error && (
                 <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 text-red-700 rounded-lg flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -687,30 +729,35 @@ const UploadPage: React.FC = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="private">{t('upload.visibilityOptions.private') || '私有'}</SelectItem>
+                          {hasEnterprise && (
+                            <SelectItem value="enterprise">{t('upload.visibilityOptions.enterprise') || '企业'}</SelectItem>
+                          )}
+                          <SelectItem value="shared">{t('upload.visibilityOptions.shared') || '协作共享'}</SelectItem>
                           <SelectItem value="public">{t('upload.visibilityOptions.public') || '公开'}</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {promptForm.visibility === 'private' && (t('upload.visibilityOptions.privateDesc') || '仅自己可见')}
+                        {promptForm.visibility === 'public' && (t('upload.visibilityOptions.publicDesc') || '所有人可见')}
+                        {promptForm.visibility === 'enterprise' && (t('upload.visibilityOptions.enterpriseDesc') || '企业内部成员可见')}
+                        {promptForm.visibility === 'shared' && (t('upload.visibilityOptions.sharedDesc') || '仅所有者和协作者可见')}
+                      </p>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-black mb-2 flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                       </svg>
-                      {t('upload.status') || 'Status'}
+                      {t('upload.tags') || 'Tags (comma separated)'}
                     </label>
-                    <Select value={promptForm.status} onValueChange={(value) => setPromptForm({ ...promptForm, status: value })}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={t('upload.placeholder.status') || 'Select status'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="draft">{t('upload.statusOptions.draft') || '草稿'}</SelectItem>
-                        <SelectItem value="pending">{t('upload.statusOptions.pending') || '待审核'}</SelectItem>
-                        <SelectItem value="approved">{t('upload.statusOptions.approved') || '已通过'}</SelectItem>
-                        <SelectItem value="rejected">{t('upload.statusOptions.rejected') || '已拒绝'}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      value={promptForm.tags}
+                      onChange={(e) => setPromptForm({ ...promptForm, tags: e.target.value })}
+                      placeholder={t('upload.placeholder.tags') || 'tag1, tag2, tag3'}
+                      className="w-full"
+                    />
                   </div>
                 </div>
               </div>
@@ -739,33 +786,35 @@ const UploadPage: React.FC = () => {
                       className="w-full border-2 border-gray-200 focus:border-black font-mono"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-black mb-2 flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
-                      {t('upload.tags') || 'Tags (comma separated)'}
-                    </label>
-                    <Input
-                      value={promptForm.tags}
-                      onChange={(e) => setPromptForm({ ...promptForm, tags: e.target.value })}
-                      placeholder={t('upload.placeholder.tags') || 'tag1, tag2, tag3'}
-                      className="w-full"
-                    />
-                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-center mt-8">
-                <Button type="submit" disabled={loading} className="flex items-center gap-2 px-8 py-3">
+              <div className="flex justify-center gap-4 mt-8">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={handlePromptDraft}
+                  className="flex items-center gap-2 px-8 py-3"
+                >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
-                  {loading ? (t('upload.uploading') || 'Uploading...') : (t('upload.uploadPrompt') || 'Upload Prompt')}
+                  {loading ? (t('upload.saving') || 'Saving...') : (t('upload.saveDraft') || 'Save as Draft')}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={loading}
+                  onClick={handlePromptApprove}
+                  className="flex items-center gap-2 px-8 py-3"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {loading ? (t('upload.submitting') || 'Submitting...') : (t('upload.submitForApproval') || 'Submit for Approval')}
                 </Button>
               </div>
-            </form>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

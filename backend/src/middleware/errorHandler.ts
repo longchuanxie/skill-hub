@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
-import { ErrorCode, getErrorMessage, errorMessages } from '../utils/errorCodes';
+import { ErrorCode, ERROR_MESSAGES, getErrorMessage } from '../utils/errors';
 
 export interface ApiError extends Error {
   statusCode?: number;
@@ -10,8 +10,8 @@ export interface ApiError extends Error {
 
 const getAcceptLanguage = (req: Request): 'zh' | 'en' => {
   const acceptLanguage = req.headers['accept-language'] || '';
-  if (acceptLanguage.includes('zh')) {
-    return 'zh';
+  if (acceptLanguage.includes('en')) {
+    return 'en';
   }
   return 'zh';
 };
@@ -46,8 +46,8 @@ export const errorHandler = (
 
   if (err.code !== undefined) {
     errorResponse.error.code = err.code;
-    errorResponse.error.messageZh = errorMessages[err.code]?.zh || '未知错误';
-    errorResponse.error.messageEn = errorMessages[err.code]?.en || 'Unknown error';
+    errorResponse.error.messageZh = ERROR_MESSAGES[err.code]?.zh || '未知错误';
+    errorResponse.error.messageEn = ERROR_MESSAGES[err.code]?.en || 'Unknown error';
   }
 
   if (process.env.NODE_ENV === 'development') {
@@ -74,7 +74,7 @@ export class AppError extends Error {
 
 export class ValidationError extends AppError {
   constructor(message: string) {
-    super(message, 400, ErrorCode.VALIDATION_ERROR);
+    super(message, 400, ErrorCode.INVALID_INPUT);
   }
 }
 
@@ -98,6 +98,6 @@ export class NotFoundError extends AppError {
 
 export class ConflictError extends AppError {
   constructor(message: string, code?: ErrorCode) {
-    super(message, 409, code || ErrorCode.RESOURCE_CONFLICT);
+    super(message, 409, code || ErrorCode.DUPLICATE_RESOURCE);
   }
 }

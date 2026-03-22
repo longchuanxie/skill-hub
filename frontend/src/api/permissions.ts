@@ -41,8 +41,7 @@ export interface CheckPermissionResponse {
 }
 
 export interface UpdatePermissionsRequest {
-  visibility?: 'public' | 'private' | 'password-protected' | 'team';
-  password?: string;
+  visibility?: 'public' | 'private' | 'enterprise' | 'shared';
   allowComments?: boolean;
   allowForks?: boolean;
 }
@@ -56,21 +55,21 @@ export interface UpdateCollaboratorRequest {
   role: 'viewer' | 'editor' | 'admin';
 }
 
-export type Visibility = 'public' | 'private' | 'password-protected' | 'team';
+export type Visibility = 'public' | 'private' | 'enterprise' | 'shared';
 
 export const permissionsApi = {
   getPermissions: async (skillId: string): Promise<SkillPermissions> => {
-    const response = await apiClient.get(`/permissions/skills/${skillId}`);
+    const response = await apiClient.get(`/skills/${skillId}/permissions`);
     return response.data.data;
   },
 
   updatePermissions: async (skillId: string, data: UpdatePermissionsRequest): Promise<SkillPermissions> => {
-    const response = await apiClient.put(`/permissions/skills/${skillId}`, data);
+    const response = await apiClient.put(`/skills/${skillId}/permissions`, data);
     return response.data.data;
   },
 
   addCollaborator: async (skillId: string, userId: string, role?: 'viewer' | 'editor' | 'admin'): Promise<SkillPermissions> => {
-    const response = await apiClient.post(`/permissions/skills/${skillId}/collaborators`, { userId, role });
+    const response = await apiClient.post(`/skills/${skillId}/collaborators`, { userId, role });
     return response.data.data;
   },
 
@@ -79,21 +78,21 @@ export const permissionsApi = {
     userId: string,
     role: 'viewer' | 'editor' | 'admin'
   ): Promise<SkillPermissions> => {
-    const response = await apiClient.put(`/permissions/skills/${skillId}/collaborators/${userId}`, { role });
+    const response = await apiClient.put(`/skills/${skillId}/collaborators/${userId}`, { role });
     return response.data.data;
   },
 
   removeCollaborator: async (skillId: string, userId: string): Promise<void> => {
-    await apiClient.delete(`/permissions/skills/${skillId}/collaborators/${userId}`);
+    await apiClient.delete(`/skills/${skillId}/collaborators/${userId}`);
   },
 
   getPermissionAuditLogs: async (skillId: string): Promise<PermissionAuditLog[]> => {
-    const response = await apiClient.get(`/permissions/skills/${skillId}/audit-logs`);
+    const response = await apiClient.get(`/skills/${skillId}/permissions/audit-logs`);
     return response.data.data;
   },
 
   checkPermission: async (skillId: string, permission: 'view' | 'edit' | 'delete' | 'manage'): Promise<CheckPermissionResponse> => {
-    const response = await apiClient.get(`/permissions/skills/${skillId}/check`, {
+    const response = await apiClient.get(`/skills/${skillId}/permissions/check`, {
       params: { permission }
     });
     return response.data.data;

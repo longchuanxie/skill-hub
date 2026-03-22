@@ -1,11 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Layout from '../components/Layout';
 import { skillApi } from '../api/market';
 import { useAuthStore } from '../stores/authStore';
+
+const FILE_TYPE_GROUPS: Record<string, string[]> = {
+  'script': ['js', 'ts', 'jsx', 'tsx', 'mjs'],
+  'web': ['html', 'css', 'scss', 'sass', 'less'],
+  'config': ['json', 'yaml', 'yml', 'xml', 'toml', 'ini', 'env'],
+  'docs': ['md', 'txt', 'rst', 'adoc'],
+  'data': ['csv', 'tsv', 'sql'],
+  'images': ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'],
+  'other': ['zip', 'tar', 'gz', 'rar', '7z', 'pdf'],
+};
+
+const FILE_TYPE_LABELS: Record<string, { en: string; zh: string }> = {
+  'script': { en: 'Script', zh: '脚本' },
+  'web': { en: 'Web', zh: '网页' },
+  'config': { en: 'Config', zh: '配置' },
+  'docs': { en: 'Docs', zh: '文档' },
+  'data': { en: 'Data', zh: '数据' },
+  'images': { en: 'Images', zh: '图片' },
+  'other': { en: 'Other', zh: '其他' },
+};
+
+const getFileType = (filename: string): string => {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  for (const [type, extensions] of Object.entries(FILE_TYPE_GROUPS)) {
+    if (extensions.includes(ext)) {
+      return type;
+    }
+  }
+  return 'other';
+};
 
 interface FileTreeNode {
   name: string;
@@ -18,6 +49,7 @@ interface FileTreeNode {
 }
 
 const SkillPreviewPage: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -29,6 +61,52 @@ const SkillPreviewPage: React.FC = () => {
   const [error, setError] = useState('');
   const [skillName, setSkillName] = useState('');
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+  const [filterType, setFilterType] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const allFileTypes = useMemo(() => {
+    const types = new Set<string>();
+    const collectTypes = (nodes: FileTreeNode[]) => {
+      nodes.forEach(node => {
+        if (node.type === 'file') {
+          types.add(getFileType(node.name));
+        }
+        if (node.children) {
+          collectTypes(node.children);
+        }
+      });
+    };
+    collectTypes(fileTree);
+    return Array.from(types);
+  }, [fileTree]);
+
+  const filteredFileTree = useMemo(() => {
+    if (filterType === 'all' && !searchTerm) {
+      return fileTree;
+    }
+
+    const filterNodes = (nodes: FileTreeNode[]): FileTreeNode[] => {
+      return nodes.reduce<FileTreeNode[]>((acc, node) => {
+        if (node.type === 'directory') {
+          const filteredChildren = filterNodes(node.children || []);
+          if (filteredChildren.length > 0 || matchesFilter(node.name)) {
+            acc.push({ ...node, children: filteredChildren });
+          }
+        } else if (matchesFilter(node.name)) {
+          acc.push(node);
+        }
+        return acc;
+      }, []);
+    };
+
+    const matchesFilter = (name: string): boolean => {
+      const typeMatch = filterType === 'all' || getFileType(name) === filterType;
+      const searchMatch = !searchTerm || name.toLowerCase().includes(searchTerm.toLowerCase());
+      return typeMatch && searchMatch;
+    };
+
+    return filterNodes(fileTree);
+  }, [fileTree, filterType, searchTerm]);
 
   useEffect(() => {
     const fetchFileTree = async () => {
@@ -121,7 +199,7 @@ const SkillPreviewPage: React.FC = () => {
     if (!selectedFile) {
       return (
         <div className="flex items-center justify-center h-full text-gray-400">
-          Select a file to preview
+          {t('preview.selectFileToPreview')}
         </div>
       );
     }
@@ -140,7 +218,7 @@ const SkillPreviewPage: React.FC = () => {
     if (isImage) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-gray-400">Image preview not available</p>
+          <p className="text-gray-400">{t('preview.imagePreviewNotAvailable')}</p>
         </div>
       );
     }
@@ -150,6 +228,11 @@ const SkillPreviewPage: React.FC = () => {
         <code>{fileContent}</code>
       </pre>
     );
+  };
+
+  const getTypeLabel = (type: string): string => {
+    const labels = FILE_TYPE_LABELS[type] || { en: type, zh: type };
+    return i18n.language === 'zh' ? labels.zh : labels.en;
   };
 
   if (loading) {
@@ -181,7 +264,7 @@ const SkillPreviewPage: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              Back to Skills
+              {t('skills.backToSkills')}
             </Button>
           </div>
         </div>
@@ -196,29 +279,60 @@ const SkillPreviewPage: React.FC = () => {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to Skill
+          {t('skills.backToSkills')}
         </Button>
 
         <Card className="border-2 border-gray-200">
           <CardHeader className="border-b-2 border-gray-200">
-            <div className="flex items-center gap-3">
-              <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              <CardTitle className="text-xl text-black">Preview: {skillName}</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <CardTitle className="text-xl text-black">{t('preview.title')}: {skillName}</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => i18n.changeLanguage(i18n.language === 'zh' ? 'en' : 'zh')}
+                  className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+                >
+                  {i18n.language === 'zh' ? 'EN' : '中文'}
+                </button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="flex h-[70vh]">
               <div className="w-1/3 border-r border-gray-200 overflow-auto">
-                <div className="p-4">
-                  {fileTree.length === 0 ? (
+                <div className="p-4 space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      placeholder={t('preview.searchFiles')}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <select
+                      value={filterType}
+                      onChange={(e) => setFilterType(e.target.value)}
+                      className="px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">{t('preview.allTypes')}</option>
+                      {allFileTypes.map(type => (
+                        <option key={type} value={type}>
+                          {getTypeLabel(type)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {filteredFileTree.length === 0 ? (
                     <div className="text-center text-gray-400 py-8">
-                      No files found
+                      {t('preview.noFilesFound')}
                     </div>
                   ) : (
-                    renderFileTree(fileTree)
+                    renderFileTree(filteredFileTree)
                   )}
                 </div>
               </div>

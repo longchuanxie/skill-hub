@@ -6,6 +6,7 @@ import { AuthRequest } from '../middleware/auth';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
 import { Types } from 'mongoose';
+import { reviewPrompt } from '../utils/resourceAutoReview';
 
 const logger = createLogger('PromptController');
 
@@ -38,7 +39,7 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
   try {
     logger.info('Creating prompt', { userId: req.user?.userId, name: req.body.name, visibility: req.body.visibility });
     
-    const { name, description, content, variables, category, tags, visibility, updateDescription } = req.body;
+    const { name, description, content, variables, category, tags, visibility, updateDescription, status } = req.body;
 
     if (!req.user?.userId) {
       logger.warn('Create prompt failed - unauthorized', { ip: req.ip });
@@ -47,11 +48,28 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    if (!updateDescription) {
-      logger.warn('Create prompt failed - update description required', { userId: req.user?.userId });
-      const error = createErrorResponse(ErrorCode.UPDATE_DESCRIPTION_REQUIRED);
-      res.status(error.statusCode).json(error);
-      return;
+    let finalStatus: 'draft' | 'pending' | 'approved' | 'rejected' = 'draft';
+    let autoReviewResult: { passed: boolean; issues?: string[]; warnings?: string[] } | undefined;
+
+    if (status === 'approved' || status === 'pending') {
+      const reviewResult = await reviewPrompt({ name, description, content, category, tags });
+      autoReviewResult = {
+        passed: reviewResult.passed,
+        issues: reviewResult.reasons,
+        warnings: reviewResult.warnings,
+      };
+      if (reviewResult.passed) {
+        finalStatus = 'approved';
+      } else {
+        finalStatus = 'rejected';
+      }
+      logger.info('Prompt auto review completed', { 
+        userId: req.user?.userId, 
+        passed: reviewResult.passed, 
+        status: finalStatus 
+      });
+    } else {
+      finalStatus = 'draft';
     }
 
     const existingPrompt = await Prompt.findOne({
@@ -60,6 +78,13 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
     });
 
     if (existingPrompt) {
+      if (!updateDescription) {
+        logger.warn('Create prompt failed - update description required for new version', { userId: req.user?.userId });
+        const error = createErrorResponse(ErrorCode.UPDATE_DESCRIPTION_REQUIRED);
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
       logger.info('Prompt with same name exists, creating new version', {
         promptId: existingPrompt._id,
         name,
@@ -131,6 +156,7 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       tags: tags || [],
       owner: req.user?.userId,
       visibility: visibility || 'private',
+      status: finalStatus,
       version: '1.0.0',
     });
 
@@ -142,7 +168,7 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       content,
       description,
       variables: variables || [],
-      updateDescription,
+      updateDescription: updateDescription || `Initial version`,
     });
 
     await promptVersion.save();
@@ -154,7 +180,7 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       versionNumber: 1,
       content,
       files: [],
-      changelog: updateDescription,
+      changelog: updateDescription || `Initial version`,
       tags: tags || [],
       isActive: true,
       createdBy: req.user!.userId,
@@ -162,12 +188,13 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
     await resourceVersion.save();
     logger.debug('ResourceVersion created for prompt', { resourceVersionId: resourceVersion._id, version: resourceVersion.version });
     
-    logger.info('Prompt created successfully', { promptId: prompt._id, userId: req.user?.userId, name: prompt.name, visibility: prompt.visibility });
+    logger.info('Prompt created successfully', { promptId: prompt._id, userId: req.user?.userId, name: prompt.name, visibility: prompt.visibility, status: prompt.status });
     
     res.status(201).json({
       message: 'Prompt created successfully',
       prompt,
       isNew: true,
+      autoReviewResult,
     });
   } catch (error) {
     logger.error('Create prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
@@ -253,7 +280,7 @@ export const getPromptById = async (req: AuthRequest, res: Response): Promise<vo
 export const updatePrompt = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { updateDescription, ...updates } = req.body;
+    const { updateDescription, status, ...updates } = req.body;
 
     const prompt = await Prompt.findById(id);
     if (!prompt) {
@@ -297,9 +324,39 @@ export const updatePrompt = async (req: AuthRequest, res: Response): Promise<voi
     if (hasContentChanges || hasDescriptionChanges || hasVariablesChanges) {
       prompt.version = newVersion;
     }
+
+    let autoReviewResult: { passed: boolean; issues?: string[]; warnings?: string[] } | undefined;
+
+    if (status === 'approved' || status === 'pending') {
+      const reviewResult = await reviewPrompt({ 
+        name: prompt.name, 
+        description: prompt.description, 
+        content: prompt.content, 
+        category: prompt.category, 
+        tags: prompt.tags 
+      });
+      autoReviewResult = {
+        passed: reviewResult.passed,
+        issues: reviewResult.reasons,
+        warnings: reviewResult.warnings,
+      };
+      if (reviewResult.passed) {
+        prompt.status = 'approved';
+      } else {
+        prompt.status = 'rejected';
+      }
+      logger.info('Prompt update auto review completed', { 
+        promptId: prompt._id,
+        userId: req.user?.userId, 
+        passed: reviewResult.passed, 
+        status: prompt.status 
+      });
+    } else if (status) {
+      prompt.status = status;
+    }
     
     await prompt.save();
-    res.json(prompt);
+    res.json({ prompt, autoReviewResult });
   } catch (error) {
     logger.error('Update prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
@@ -341,7 +398,8 @@ export const ratePrompt = async (req: AuthRequest, res: Response): Promise<void>
 
     const prompt = await Prompt.findById(id);
     if (!prompt) {
-      res.status(404).json({ error: 'Prompt not found' });
+      const error = createErrorResponse(ErrorCode.PROMPT_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -361,7 +419,9 @@ export const ratePrompt = async (req: AuthRequest, res: Response): Promise<void>
     await prompt.save();
     res.json({ message: 'Rating submitted', averageRating: prompt.averageRating });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to rate prompt' });
+    logger.error('Rate prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -372,7 +432,8 @@ export const renderPrompt = async (req: AuthRequest, res: Response): Promise<voi
 
     const prompt = await Prompt.findById(id);
     if (!prompt) {
-      res.status(404).json({ error: 'Prompt not found' });
+      const error = createErrorResponse(ErrorCode.PROMPT_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -387,7 +448,9 @@ export const renderPrompt = async (req: AuthRequest, res: Response): Promise<voi
 
     res.json({ result });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to render prompt' });
+    logger.error('Render prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 
@@ -397,7 +460,8 @@ export const copyPrompt = async (req: AuthRequest, res: Response): Promise<void>
 
     const prompt = await Prompt.findById(id);
     if (!prompt) {
-      res.status(404).json({ error: 'Prompt not found' });
+      const error = createErrorResponse(ErrorCode.PROMPT_NOT_FOUND);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -406,7 +470,8 @@ export const copyPrompt = async (req: AuthRequest, res: Response): Promise<void>
       String(prompt.owner) === req.user?.userId;
 
     if (!hasAccess) {
-      res.status(403).json({ error: 'Access denied' });
+      const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
+      res.status(error.statusCode).json(error);
       return;
     }
 
@@ -437,7 +502,9 @@ export const copyPrompt = async (req: AuthRequest, res: Response): Promise<void>
 
     res.json(copiedPrompt);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to copy prompt' });
+    logger.error('Copy prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
   }
 };
 

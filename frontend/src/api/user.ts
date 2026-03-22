@@ -32,4 +32,11 @@ export const userApi = {
     });
     return response.data;
   },
+
+  searchUsers: async (query: string, limit: number = 10): Promise<{ users: { _id: string; username: string; email: string; avatar?: string }[] }> => {
+    const response = await userClient.get<{ users: { _id: string; username: string; email: string; avatar?: string }[] }>('/users/search', {
+      params: { q: query, limit },
+    });
+    return response.data;
+  },
 };

@@ -10,8 +10,7 @@ interface Collaborator {
 
 export interface ISkillPermissions extends Document {
   skillId: Types.ObjectId | string;
-  visibility: 'public' | 'private' | 'password-protected';
-  password?: string;
+  visibility: 'public' | 'private' | 'enterprise' | 'shared';
   allowComments: boolean;
   allowForks: boolean;
   collaborators: Collaborator[];
@@ -54,11 +53,8 @@ const skillPermissionsSchema = new Schema<ISkillPermissions>({
   },
   visibility: {
     type: String,
-    enum: ['public', 'private', 'password-protected'],
+    enum: ['public', 'private', 'enterprise', 'shared'],
     default: 'private',
-  },
-  password: {
-    type: String,
   },
   allowComments: {
     type: Boolean,

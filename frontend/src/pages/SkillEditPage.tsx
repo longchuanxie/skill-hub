@@ -37,6 +37,15 @@ const SkillEditPage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [skillFile, setSkillFile] = useState<File | undefined>(undefined);
+  const [existingFiles, setExistingFiles] = useState<Array<{
+    filename: string;
+    originalName: string;
+    path: string;
+    size: number;
+    mimetype: string;
+  }>>([]);
+
+  const hasEnterprise = !!user?.enterpriseId;
 
   const [form, setForm] = useState({
     name: '',
@@ -63,6 +72,9 @@ const SkillEditPage: React.FC = () => {
           visibility: skill.visibility,
           status: skill.status,
         });
+        if (skill.files && skill.files.length > 0) {
+          setExistingFiles(skill.files);
+        }
       } catch (err) {
         setError(t('edit.error.loadFailed'));
       } finally {
@@ -245,9 +257,19 @@ const SkillEditPage: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="private">{t('upload.visibilityOptions.private')}</SelectItem>
+                {hasEnterprise && (
+                  <SelectItem value="enterprise">{t('upload.visibilityOptions.enterprise')}</SelectItem>
+                )}
+                <SelectItem value="shared">{t('upload.visibilityOptions.shared')}</SelectItem>
                 <SelectItem value="public">{t('upload.visibilityOptions.public')}</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              {form.visibility === 'private' && t('upload.visibilityOptions.privateDesc')}
+              {form.visibility === 'public' && t('upload.visibilityOptions.publicDesc')}
+              {form.visibility === 'enterprise' && t('upload.visibilityOptions.enterpriseDesc')}
+              {form.visibility === 'shared' && t('upload.visibilityOptions.sharedDesc')}
+            </p>
           </div>
 
           <div>
@@ -257,17 +279,20 @@ const SkillEditPage: React.FC = () => {
               </svg>
               {t('upload.status')}
             </label>
-            <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">{t('upload.statusOptions.draft')}</SelectItem>
-                <SelectItem value="pending">{t('upload.statusOptions.pending')}</SelectItem>
-                <SelectItem value="approved">{t('upload.statusOptions.approved')}</SelectItem>
-                <SelectItem value="rejected">{t('upload.statusOptions.rejected')}</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+                form.status === 'approved' ? 'bg-green-100 text-green-800' :
+                form.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                form.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {form.status === 'draft' ? t('upload.statusOptions.draft') :
+                 form.status === 'pending' ? t('upload.statusOptions.pending') :
+                 form.status === 'approved' ? t('upload.statusOptions.approved') :
+                 form.status === 'rejected' ? t('upload.statusOptions.rejected') : form.status}
+              </span>
+              <span className="text-xs text-gray-500">({t('common.readOnly') || '只读'})</span>
+            </div>
           </div>
 
           <div>
@@ -291,6 +316,25 @@ const SkillEditPage: React.FC = () => {
               </svg>
               {t('upload.skillFile')} (ZIP)
             </label>
+            {existingFiles.length > 0 && (
+              <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm font-medium text-black mb-2">{t('upload.existingFiles') || '现有文件'}:</p>
+                <ul className="space-y-1">
+                  {existingFiles.map((file, index) => (
+                    <li key={index} className="flex items-center gap-2 text-sm text-gray-700">
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="font-medium">{file.originalName || file.filename}</span>
+                      <span className="text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-gray-500 mt-2">
+                  {t('upload.replaceFileHint') || '上传新文件将替换现有文件'}
+                </p>
+              </div>
+            )}
             <Input
               type="file"
               accept=".zip"
