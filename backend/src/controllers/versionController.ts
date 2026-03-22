@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import { ResourceVersion } from '../models/ResourceVersion';
 import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
+import { zipAnalyzerService } from '../services/ZipAnalyzerService';
 import path from 'path';
 import fs from 'fs';
 import AdmZip from 'adm-zip';
@@ -10,15 +11,40 @@ import AdmZip from 'adm-zip';
 export const getVersions = async (req: Request, res: Response) => {
   try {
     const { resourceId, resourceType } = req.params;
+    const { 
+      page = 1, 
+      pageSize = 10, 
+      sortBy = 'versionNumber', 
+      sortOrder = 'desc' 
+    } = req.query;
 
-    const versions = await ResourceVersion.find({ 
-      resourceId,
-      resourceType 
-    }).sort({ versionNumber: -1 });
+    const skip = (Number(page) - 1) * Number(pageSize);
+    
+    const sortField: string = sortBy === 'createdBy' ? 'createdBy' : sortBy === 'createdAt' ? 'createdAt' : 'versionNumber';
+    const sortDirection: 1 | -1 = sortOrder === 'asc' ? 1 : -1;
+    const sortOptions: any = {};
+    sortOptions[sortField] = sortDirection;
+
+    const [versions, total] = await Promise.all([
+      ResourceVersion.find({ 
+        resourceId,
+        resourceType 
+      })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(Number(pageSize))
+      .populate('createdBy', 'username'),
+      ResourceVersion.countDocuments({ resourceId, resourceType })
+    ]);
 
     res.json({
-      success: true,
-      data: versions
+      versions,
+      pagination: {
+        page: Number(page),
+        pageSize: Number(pageSize),
+        total,
+        totalPages: Math.ceil(total / Number(pageSize)),
+      }
     });
   } catch (error) {
     console.error('获取版本列表时出错:', error);
@@ -448,6 +474,135 @@ export const downloadVersion = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to download version'
+    });
+  }
+};
+
+export const compareVersionsDetailed = async (req: Request, res: Response) => {
+  try {
+    const { resourceId } = req.params;
+    const { from, to, files } = req.query;
+
+    const [fromVersion, toVersion] = await Promise.all([
+      ResourceVersion.findOne({ resourceId, version: from }),
+      ResourceVersion.findOne({ resourceId, version: to })
+    ]);
+
+    if (!fromVersion || !toVersion) {
+      return res.status(404).json({
+        success: false,
+        error: 'One or both versions not found'
+      });
+    }
+
+    const fromZipPath = fromVersion.files[0]?.path;
+    const toZipPath = toVersion.files[0]?.path;
+
+    if (!fromZipPath || !toZipPath) {
+      return res.status(400).json({
+        success: false,
+        error: 'No zip files available for comparison'
+      });
+    }
+
+    const fullFromPath = path.join(process.cwd(), fromZipPath);
+    const fullToPath = path.join(process.cwd(), toZipPath);
+
+    if (!fs.existsSync(fullFromPath) || !fs.existsSync(fullToPath)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Zip file not found'
+      });
+    }
+
+    const diffResult = await zipAnalyzerService.compareZips(fullFromPath, fullToPath);
+
+    let fileContents: Record<string, { old?: string; new?: string }> | undefined;
+    if (files && typeof files === 'string' && files.length > 0) {
+      const fileList = files.split(',');
+      const [oldContents, newContents] = await Promise.all([
+        zipAnalyzerService.extractFiles(fullFromPath, fileList),
+        zipAnalyzerService.extractFiles(fullToPath, fileList),
+      ]);
+
+      fileContents = {};
+      for (const fp of fileList) {
+        fileContents[fp] = {
+          old: oldContents.get(fp),
+          new: newContents.get(fp),
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        fromVersion: fromVersion.version,
+        toVersion: toVersion.version,
+        diff: diffResult,
+        fileContents,
+      }
+    });
+  } catch (error) {
+    console.error('详细对比版本时出错:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compare versions in detail'
+    });
+  }
+};
+
+export const getVersionFileContent = async (req: Request, res: Response) => {
+  try {
+    const { resourceId, version, filePath } = req.params;
+    const { encoding = 'utf8' } = req.query;
+
+    const versionData = await ResourceVersion.findOne({ resourceId, version });
+    if (!versionData) {
+      return res.status(404).json({
+        success: false,
+        error: 'Version not found'
+      });
+    }
+
+    const zipPath = versionData.files[0]?.path;
+    if (!zipPath) {
+      return res.status(400).json({
+        success: false,
+        error: 'No zip file in this version'
+      });
+    }
+
+    const fullPath = path.join(process.cwd(), zipPath);
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Zip file not found'
+      });
+    }
+
+    const decodedFilePath = decodeURIComponent(filePath as string);
+    const content = await zipAnalyzerService.extractFileContent(fullPath, decodedFilePath);
+    if (content === null) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found in zip'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        path: decodedFilePath,
+        content,
+        encoding,
+      }
+    });
+  } catch (error) {
+    console.error('获取版本文件内容时出错:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get file content'
     });
   }
 };

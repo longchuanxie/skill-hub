@@ -1,5 +1,63 @@
 {
-  "dependencies": {
-    "chrome-remote-interface": "^0.34.0"
-  }
+  "name": "@xielc/skillhub",
+  "version": "1.0.0",
+  "description": "SkillHub AI Resource Platform - Enterprise-grade AI skills and prompts management platform",
+  "main": "backend/dist/app.js",
+  "files": [
+    "backend/dist/",
+    "frontend/dist/",
+    "backend/src/config/",
+    "backend/src/utils/",
+    "backend/src/middleware/auth.ts",
+    "backend/src/middleware/errorHandler.ts",
+    "backend/src/models/",
+    "backend/src/controllers/",
+    "backend/src/routes/",
+    "backend/src/services/",
+    "backend/src/types/",
+    "backend/src/validations/",
+    "backend/src/interfaces/",
+    "backend/src/app.ts",
+    "backend/src/app-memory.ts",
+    "backend/package.json",
+    "frontend/package.json",
+    "backend/.env.example",
+    "backend/uploads/.gitkeep"
+  ],
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "build:all": "cd frontend && npm run build && cd ../backend && npm run build",
+    "postinstall": "npm run build:all",
+    "start": "cd backend && npm start",
+    "test": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm run test",
+    "setup": "npm run install:all && npm run build"
+  },
+  "keywords": [
+    "skillhub",
+    "ai",
+    "skills",
+    "prompts",
+    "agent",
+    "llm",
+    "gpt",
+    "claude",
+    "mcp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xielc/skill-hub"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/xielc/skill-hub/issues"
+  },
+  "homepage": "https://github.com/xielc/skill-hub#readme"
 }

@@ -5,7 +5,7 @@ import { Prompt } from '../models/Prompt';
 import { SkillVersion } from '../models/SkillVersion';
 import { PromptVersion } from '../models/PromptVersion';
 import { ResourceVersion } from '../models/ResourceVersion';
-import { skillFileUpload } from '../middleware/upload';
+import { skillFileUpload, getFileUrl } from '../middleware/upload';
 import { downloadSkill } from '../controllers/SkillController';
 import {
   determineResourceStatus,
@@ -185,7 +185,7 @@ async function handleSkillCreate(req: AgentRequest, res: Response, hasFile: bool
   }
 
   if (hasFile) {
-    const fileUrl = `/uploads/${req.file!.filename}`;
+    const fileUrl = getFileUrl(req.file!.filename);
     skillData.files = [{
       filename: req.file!.originalname,
       originalName: req.file!.originalname,
@@ -249,7 +249,7 @@ async function handleSkillUpdate(req: AgentRequest, res: Response, existingSkill
   }
 
   if (hasFile) {
-    const fileUrl = `/uploads/${req.file!.filename}`;
+    const fileUrl = getFileUrl(req.file!.filename);
 
     const skillVersion = new SkillVersion({
       skillId: existingSkill._id,

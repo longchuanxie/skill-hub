@@ -18,12 +18,10 @@ import SkillEditPage from './pages/SkillEditPage';
 import SkillOnlineTestPage from './pages/SkillOnlineTestPage';
 import SkillPermissionsPage from './pages/SkillPermissionsPage';
 import SkillVersionHistoryPage from './pages/SkillVersionHistoryPage';
-import SkillVersionComparePage from './pages/SkillVersionComparePage';
 import SkillPreviewPage from './pages/SkillPreviewPage';
 import PromptDetailPage from './pages/PromptDetailPage';
 import PromptEditPage from './pages/PromptEditPage';
 import PromptVersionHistoryPage from './pages/PromptVersionHistoryPage';
-import PromptVersionComparePage from './pages/PromptVersionComparePage';
 import CustomPageView from './pages/CustomPageView';
 import OAuthCallback from './pages/OAuthCallback';
 import ApiResourcesPage from './pages/ApiResourcesPage';
@@ -58,12 +56,10 @@ function App() {
         <Route path="/skills/:id/test" element={<ProtectedRoute><SkillOnlineTestPage /></ProtectedRoute>} />
         <Route path="/skills/:id/permissions" element={<ProtectedRoute><SkillPermissionsPage /></ProtectedRoute>} />
         <Route path="/skills/:id/versions" element={<ProtectedRoute><SkillVersionHistoryPage /></ProtectedRoute>} />
-        <Route path="/skills/:id/versions/compare" element={<ProtectedRoute><SkillVersionComparePage /></ProtectedRoute>} />
         <Route path="/prompts" element={<PromptsMarketPage />} />
         <Route path="/prompts/:id" element={<PromptDetailPage />} />
         <Route path="/prompts/:id/edit" element={<ProtectedRoute><PromptEditPage /></ProtectedRoute>} />
         <Route path="/prompts/:id/versions" element={<ProtectedRoute><PromptVersionHistoryPage /></ProtectedRoute>} />
-        <Route path="/prompts/:id/compare" element={<ProtectedRoute><PromptVersionComparePage /></ProtectedRoute>} />
         <Route path="/page/:pageKey" element={<CustomPageView />} />
         <Route path="/oauth/callback" element={<OAuthCallback />} />
         <Route path="/my/resources" element={<ProtectedRoute><MyResourcesPage /></ProtectedRoute>} />

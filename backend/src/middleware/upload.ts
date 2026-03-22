@@ -1,16 +1,18 @@
 import multer from 'multer';
 import path from 'path';
-import crypto from 'crypto';
 import { Request } from 'express';
 import { createLogger } from '../utils/logger';
+import { getStorageAdapter } from '../adapters/StorageFactory';
+import { getLocalPath } from '../config/storage';
 
 const logger = createLogger('uploadMiddleware');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(process.cwd(), 'uploads'));
+    cb(null, path.resolve(getLocalPath()));
   },
   filename: (req, file, cb) => {
+    const crypto = require('crypto');
     const uniqueSuffix = crypto.randomBytes(16).toString('hex');
     const ext = path.extname(file.originalname);
     cb(null, `${uniqueSuffix}${ext}`);
@@ -24,17 +26,17 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
     '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
     '.pdf', '.doc', '.docx', '.xls', '.xlsx',
   ];
-  
+
   const ext = path.extname(file.originalname).toLowerCase();
-  
+
   if (allowedTypes.includes(ext)) {
     cb(null, true);
   } else {
-    logger.warn('File upload rejected - invalid file type', { 
-      filename: file.originalname, 
-      mimetype: file.mimetype, 
+    logger.warn('File upload rejected - invalid file type', {
+      filename: file.originalname,
+      mimetype: file.mimetype,
       ext,
-      ip: req.ip 
+      ip: req.ip
     });
     cb(new Error(`File type ${ext} not allowed`));
   }
@@ -51,3 +53,8 @@ export const upload = multer({
 export const skillFileUpload = upload.single('file');
 export const avatarUpload = upload.single('avatar');
 export const enterpriseLogoUpload = upload.single('logo');
+
+export const getFileUrl = (filename: string): string => {
+  const adapter = getStorageAdapter();
+  return adapter.getUrl(filename);
+};

@@ -2,6 +2,7 @@ import { Response, Request, Express } from 'express';
 import { Enterprise } from '../models/Enterprise';
 import { User } from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { getFileUrl } from '../middleware/upload';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('EnterpriseController');
@@ -128,7 +129,7 @@ export const updateEnterprise = async (req: AuthRequest, res: Response): Promise
     }
 
     if (req.file) {
-      updates.logo = `/uploads/${req.file.filename}`;
+      updates.logo = getFileUrl(req.file.filename);
     }
 
     Object.assign(enterprise, updates);
