@@ -136,32 +136,32 @@ const SkillsMarketPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div className="flex items-center gap-3 mb-4 md:mb-0">
-            <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-0">
+            <svg className="w-6 h-6 sm:w-8 sm:h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
             </svg>
-            <h1 className="text-3xl font-bold text-black">{t('skills.marketplace')}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-black">{t('skills.marketplace')}</h1>
           </div>
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <form onSubmit={handleSearch} className="flex-1 flex gap-3">
+        <div className="flex flex-col gap-4 mb-6 sm:mb-8">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <Input
                 placeholder={t('skills.searchPlaceholder')}
                 value={search}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-                className="pl-10"
+                className="pl-9 sm:pl-10"
               />
             </div>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="w-full sm:w-44">
                 <SelectValue placeholder={t('skills.allCategories')} />
               </SelectTrigger>
               <SelectContent>
@@ -173,7 +173,7 @@ const SkillsMarketPage: React.FC = () => {
                 <SelectItem value="data-analysis">{t('skills.categories.dataAnalysis')}</SelectItem>
               </SelectContent>
             </Select>
-            <Button type="submit" className="flex items-center gap-2">
+            <Button type="submit" className="w-full sm:w-auto flex items-center justify-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -182,7 +182,7 @@ const SkillsMarketPage: React.FC = () => {
           </form>
           
           <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder={t('skills.sortBy')} />
             </SelectTrigger>
             <SelectContent>
