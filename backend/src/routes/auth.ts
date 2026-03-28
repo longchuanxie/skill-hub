@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
-import { register, login, refreshToken, logout, getMe } from '../controllers/authController';
+import { register, login, refreshToken, logout, getMe, registerAdmin } from '../controllers/authController';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { registerValidation, loginValidation, refreshTokenValidation } from '../validations/authValidation';
 import {
@@ -24,6 +24,7 @@ import { ErrorCode, createErrorResponse } from '../utils/errors';
 const router = Router();
 
 router.post('/register', publicApiLimiter, registerValidation, register);
+router.post('/register/admin', publicApiLimiter, registerValidation, registerAdmin);
 router.post('/login', publicApiLimiter, loginValidation, login);
 router.post('/refresh', refreshTokenValidation, refreshToken);
 router.post('/logout', logout);

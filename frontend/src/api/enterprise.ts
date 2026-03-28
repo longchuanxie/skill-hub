@@ -10,6 +10,22 @@ export interface ResourceReviewSettings {
   enableContentFilter: boolean;
 }
 
+export interface Invitation {
+  _id: string;
+  email: string;
+  enterpriseId: string;
+  invitedBy: {
+    _id: string;
+    username: string;
+    email: string;
+  };
+  role: 'admin' | 'member';
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
 export const enterpriseApi = {
   createEnterprise: async (data: { name: string; description?: string }) => {
     const response = await apiClient.post('/enterprises', data);
@@ -28,6 +44,46 @@ export const enterpriseApi = {
 
   updateEnterprise: async (id: string, data: any) => {
     const response = await apiClient.put(`/enterprises/${id}`, data);
+    return response.data;
+  },
+
+  inviteMember: async (id: string, data: { email: string; role?: 'admin' | 'member' }) => {
+    const response = await apiClient.post(`/enterprises/${id}/invite`, data);
+    return response.data;
+  },
+
+  getInvitations: async (id: string): Promise<Invitation[]> => {
+    const response = await apiClient.get(`/enterprises/${id}/invitations`);
+    return response.data;
+  },
+
+  cancelInvitation: async (id: string, invitationId: string) => {
+    const response = await apiClient.delete(`/enterprises/${id}/invitations/${invitationId}`);
+    return response.data;
+  },
+
+  acceptInvitation: async (token: string) => {
+    const response = await apiClient.post(`/invitation/${token}/accept`);
+    return response.data;
+  },
+
+  declineInvitation: async (token: string) => {
+    const response = await apiClient.post(`/invitation/${token}/decline`);
+    return response.data;
+  },
+
+  removeMember: async (id: string, memberId: string) => {
+    const response = await apiClient.delete(`/enterprises/${id}/members/${memberId}`);
+    return response.data;
+  },
+
+  updateMemberRole: async (id: string, memberId: string, role: string) => {
+    const response = await apiClient.put(`/enterprises/${id}/members/${memberId}`, { role });
+    return response.data;
+  },
+
+  leaveEnterprise: async () => {
+    const response = await apiClient.post('/enterprises/leave');
     return response.data;
   },
 

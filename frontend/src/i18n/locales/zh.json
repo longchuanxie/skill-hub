@@ -665,5 +665,88 @@
     "searchFiles": "搜索文件...",
     "allTypes": "全部类型",
     "noFilesFound": "没有找到文件"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "管理控制台",
+      "subtitle": "管理用户、企业和监控平台活动",
+      "totalUsers": "总用户数",
+      "totalEnterprises": "总企业数",
+      "totalSkills": "总技能数",
+      "totalPrompts": "总提示词数",
+      "activeUsers": "活跃用户（近7天）",
+      "pendingApprovals": "待审批",
+      "today": "今日",
+      "userManagement": "用户管理",
+      "userManagementDesc": "查看和管理平台上的所有用户",
+      "goToUsers": "前往用户管理",
+      "enterpriseManagement": "企业管理",
+      "enterpriseManagementDesc": "查看和管理所有企业",
+      "goToEnterprises": "前往企业管理"
+    },
+    "users": {
+      "title": "用户管理",
+      "searchUsers": "搜索用户...",
+      "noUsersFound": "没有找到用户",
+      "id": "ID",
+      "username": "用户名",
+      "email": "邮箱",
+      "role": "角色",
+      "enterprise": "企业",
+      "memberSince": "加入时间",
+      "actions": "操作",
+      "editRole": "编辑角色",
+      "deleteUser": "删除用户",
+      "confirmDelete": "确定要删除此用户吗？",
+      "roleOptions": {
+        "admin": "管理员",
+        "enterprise_admin": "企业管理员",
+        "developer": "开发者",
+        "user": "普通用户"
+      },
+      "roleUpdated": "角色更新成功",
+      "updateFailed": "更新失败",
+      "userDeleted": "用户删除成功",
+      "deleteFailed": "删除失败"
+    },
+    "enterprises": {
+      "title": "企业管理",
+      "searchEnterprises": "搜索企业...",
+      "noEnterprisesFound": "没有找到企业",
+      "id": "ID",
+      "name": "企业名称",
+      "description": "描述",
+      "owner": "所有者",
+      "memberCount": "成员数量",
+      "createdAt": "创建时间",
+      "actions": "操作",
+      "viewMembers": "查看成员",
+      "deleteEnterprise": "删除企业",
+      "confirmDelete": "确定要删除此企业吗？",
+      "enterpriseDeleted": "企业删除成功",
+      "deleteFailed": "删除失败",
+      "members": {
+        "title": "企业成员",
+        "searchMembers": "搜索成员...",
+        "noMembersFound": "没有找到成员",
+        "id": "ID",
+        "username": "用户名",
+        "email": "邮箱",
+        "role": "角色",
+        "joinedAt": "加入时间",
+        "actions": "操作",
+        "removeMember": "移除成员",
+        "confirmRemove": "确定要移除此成员吗？",
+        "memberRemoved": "成员移除成功",
+        "removeFailed": "移除失败",
+        "inviteMember": "邀请成员",
+        "inviteSuccess": "邀请已发送",
+        "inviteFailed": "邀请发送失败",
+        "roleOptions": {
+          "admin": "管理员",
+          "member": "成员"
+        }
+      }
+    }
   }
 }

@@ -27,6 +27,9 @@ import OAuthCallback from './pages/OAuthCallback';
 import ApiResourcesPage from './pages/ApiResourcesPage';
 import AgentDetailPage from './pages/AgentDetailPage';
 import CreateAgentPage from './pages/CreateAgentPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminEnterprisesPage from './pages/AdminEnterprisesPage';
 import { useAuthStore } from './stores/authStore';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -69,6 +72,9 @@ function App() {
         <Route path="/agents" element={<ApiResourcesPage />} />
         <Route path="/agents/new" element={<ProtectedRoute><CreateAgentPage /></ProtectedRoute>} />
         <Route path="/agents/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><Layout><AdminDashboardPage /></Layout></ProtectedRoute>} />
+        <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsersPage /></Layout></ProtectedRoute>} />
+        <Route path="/admin/enterprises" element={<ProtectedRoute><Layout><AdminEnterprisesPage /></Layout></ProtectedRoute>} />
       </Routes>
       <Toaster />
     </BrowserRouter>
