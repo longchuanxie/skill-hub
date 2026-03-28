@@ -10,6 +10,7 @@ import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { enterpriseMiddleware } from './middleware/enterpriseMiddleware';
 import { initializeEnterpriseContext } from './config/enterpriseContext';
+import { getLocalPath, getBaseUrl } from './config/storage';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import skillRoutes from './routes/skills';
@@ -65,7 +66,7 @@ app.use(morgan('combined', { stream: { write: (message) => logger.info(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.resolve(getLocalPath())));
 
 initializeEnterpriseContext();
 
@@ -108,6 +109,14 @@ app.use('/api', permissionsRoutes);
 app.use('/api/rate-limit', rateLimitRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/recommendations', recommendationRoutes);
+
+if (process.env.NODE_ENV === 'production') {
+  const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req: Request, res: Response) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+}
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Not Found' });

@@ -2,6 +2,10 @@ import { Types } from 'mongoose';
 import { ResourceVersion, IResourceVersion } from '../models/ResourceVersion';
 import { Enterprise } from '../models/Enterprise';
 import { reviewSkill, reviewPrompt } from './resourceAutoReview';
+import { zipAnalyzerService } from '../services/ZipAnalyzerService';
+import { getFileUrl } from '../middleware/upload';
+import path from 'path';
+import fs from 'fs';
 
 export interface ResourceStatusResult {
   status: 'draft' | 'pending' | 'approved';
@@ -56,15 +60,28 @@ export function incrementVersion(currentVersion: string): string {
 }
 
 export async function createResourceVersion(params: {
-  resourceId: Types.ObjectId;
+  resourceId: Types.ObjectId | string;
   resourceType: 'skill' | 'prompt';
   version: string;
   content: string;
   files: any[];
   changelog: string;
   tags: string[];
-  createdBy: Types.ObjectId;
+  createdBy: Types.ObjectId | string;
 }): Promise<IResourceVersion> {
+  let fileManifest;
+
+  if (params.files && params.files.length > 0) {
+    const filePath = path.join(process.cwd(), params.files[0].path);
+    if (fs.existsSync(filePath)) {
+      try {
+        fileManifest = await zipAnalyzerService.extractManifest(filePath);
+      } catch (error) {
+        console.error('Failed to extract file manifest:', error);
+      }
+    }
+  }
+
   const resourceVersion = new ResourceVersion({
     resourceId: params.resourceId,
     resourceType: params.resourceType,
@@ -76,6 +93,8 @@ export async function createResourceVersion(params: {
     tags: params.tags,
     isActive: true,
     createdBy: params.createdBy,
+    fileManifest,
+    comparisonStatus: 'completed',
   });
 
   await resourceVersion.save();
@@ -97,7 +116,7 @@ export function buildSkillFiles(req: any): SkillFileData | null {
     return null;
   }
 
-  const fileUrl = `/uploads/${req.file.filename}`;
+  const fileUrl = getFileUrl(req.file.filename);
   return {
     filename: req.file.originalname,
     originalName: req.file.originalname,

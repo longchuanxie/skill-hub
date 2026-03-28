@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { User, IUser } from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { getFileUrl } from '../middleware/upload';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
 
@@ -173,7 +174,7 @@ export const uploadAvatar = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    user.avatar = `/uploads/${req.file.filename}`;
+    user.avatar = getFileUrl(req.file.filename);
     
     logger.info('Avatar uploaded successfully', { userId: user._id, filename: req.file.filename });
     await user.save();

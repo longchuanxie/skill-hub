@@ -9,6 +9,8 @@ import { validateSkillUpload } from '../utils/skillUploadValidator';
 import { reviewSkill } from '../utils/resourceAutoReview';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { createResourceVersion } from '../utils/resourceHelpers';
+import { getFileUrl } from '../middleware/upload';
 import { Types } from 'mongoose';
 
 const logger = createLogger('SkillController');
@@ -136,7 +138,7 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
           return;
         }
 
-        const fileUrl = `/uploads/${req.file!.filename}`;
+        const fileUrl = getFileUrl(req.file!.filename);
         
         skillData.files = [{
           filename: req.file!.originalname,
@@ -189,7 +191,7 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
       const newVersion = await generateNextVersion(existingSkill._id);
 
       if (hasFile) {
-        const fileUrl = `/uploads/${req.file!.filename}`;
+        const fileUrl = getFileUrl(req.file!.filename);
         const skillVersion = new SkillVersion({
           skillId: existingSkill._id,
           version: newVersion,
@@ -203,19 +205,18 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
         await skillVersion.save();
         logger.debug('Skill version created', { skillVersionId: skillVersion._id, version: newVersion });
 
-        existingSkill.files.push({
+        existingSkill.files = [{
           filename: req.file!.originalname,
           originalName: req.file!.originalname,
           path: fileUrl,
           size: req.file!.size,
           mimetype: req.file!.mimetype,
-        });
+        }];
 
-        const resourceVersion = new ResourceVersion({
-          resourceId: existingSkill._id,
+        const resourceVersion = await createResourceVersion({
+          resourceId: existingSkill._id.toString(),
           resourceType: 'skill',
           version: newVersion,
-          versionNumber: parseInt(newVersion.split('.').join('')),
           content: skillData.description || existingSkill.description || '',
           files: [{
             filename: req.file!.originalname,
@@ -225,10 +226,8 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
           }],
           changelog: updateDescription || `Update to version ${newVersion}`,
           tags: skillData.tags || existingSkill.tags || [],
-          isActive: true,
-          createdBy: req.user!.userId,
+          createdBy: req.user!.userId.toString(),
         });
-        await resourceVersion.save();
         logger.debug('ResourceVersion created', { resourceVersionId: resourceVersion._id, version: newVersion });
       }
 
@@ -263,7 +262,7 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
     await skill.save();
 
     if (hasFile) {
-      const fileUrl = `/uploads/${req.file!.filename}`;
+      const fileUrl = getFileUrl(req.file!.filename);
       const skillVersion = new SkillVersion({
         skillId: skill._id,
         version: '1.0.0',
@@ -277,11 +276,10 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
       await skillVersion.save();
       logger.debug('Skill version created', { skillVersionId: skillVersion._id, version: skillVersion.version });
 
-      const resourceVersion = new ResourceVersion({
-        resourceId: skill._id,
+      const resourceVersion = await createResourceVersion({
+        resourceId: skill._id.toString(),
         resourceType: 'skill',
         version: '1.0.0',
-        versionNumber: 1,
         content: skillData.description || '',
         files: [{
           filename: req.file!.originalname,
@@ -291,10 +289,8 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
         }],
         changelog: updateDescription || 'Initial version',
         tags: skillData.tags || [],
-        isActive: true,
-        createdBy: req.user!.userId,
+        createdBy: req.user!.userId.toString(),
       });
-      await resourceVersion.save();
       logger.debug('ResourceVersion created', { resourceVersionId: resourceVersion._id, version: resourceVersion.version });
     }
 
@@ -447,7 +443,7 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
           return;
         }
 
-        const fileUrl = `/uploads/${req.file!.filename}`;
+        const fileUrl = getFileUrl(req.file!.filename);
         const nextVersion = await generateNextVersion(skill._id);
         
         const skillVersion = new SkillVersion({
@@ -461,16 +457,32 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
           updateDescription: updateDescription || `Update to version ${nextVersion}`,
         });
         await skillVersion.save();
-        
+
+        const resourceVersion = await createResourceVersion({
+          resourceId: skill._id.toString(),
+          resourceType: 'skill',
+          version: nextVersion,
+          content: skill.description || '',
+          files: [{
+            filename: req.file!.originalname,
+            path: fileUrl,
+            size: req.file!.size,
+            mimetype: req.file!.mimetype,
+          }],
+          changelog: updateDescription || `Update to version ${nextVersion}`,
+          tags: skill.tags || [],
+          createdBy: req.user!.userId.toString(),
+        });
+
         skill.version = nextVersion;
-        
-        skill.files.push({
+
+        skill.files = [{
           filename: req.file!.originalname,
           originalName: req.file!.originalname,
           path: fileUrl,
           size: req.file!.size,
           mimetype: req.file!.mimetype,
-        });
+        }];
 
         if (validationResult.structure) {
           if (validationResult.structure.name) skill.name = validationResult.structure.name;
@@ -641,7 +653,7 @@ export const uploadSkillFile = async (req: AuthRequest, res: Response): Promise<
         return;
       }
 
-      const fileUrl = `/uploads/${req.file.filename}`;
+      const fileUrl = getFileUrl(req.file.filename);
       const nextVersion = await generateNextVersion(skill._id);
       
       const skillVersion = new SkillVersion({
@@ -655,15 +667,31 @@ export const uploadSkillFile = async (req: AuthRequest, res: Response): Promise<
         updateDescription: updateDescription || `Update to version ${nextVersion}`,
       });
       await skillVersion.save();
-      
+
+      const resourceVersion = await createResourceVersion({
+        resourceId: skill._id.toString(),
+        resourceType: 'skill',
+        version: nextVersion,
+        content: skill.description || '',
+        files: [{
+          filename: req.file.originalname,
+          path: fileUrl,
+          size: req.file.size,
+          mimetype: req.file.mimetype,
+        }],
+        changelog: updateDescription || `Update to version ${nextVersion}`,
+        tags: skill.tags || [],
+        createdBy: req.user!.userId.toString(),
+      });
+
       skill.version = nextVersion;
-      skill.files.push({
+      skill.files = [{
         filename: req.file.originalname,
         originalName: req.file.originalname,
         path: fileUrl,
         size: req.file.size,
         mimetype: req.file.mimetype,
-      });
+      }];
 
       if (validationResult.structure) {
         if (validationResult.structure.name) skill.name = validationResult.structure.name;
