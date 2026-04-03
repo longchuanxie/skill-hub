@@ -13,6 +13,7 @@ import ResourceReviewSettingsSection from '../components/ResourceReviewSettingsS
 import EnterpriseInfoCard from '../components/EnterpriseInfoCard';
 import CreateEnterpriseForm from '../components/CreateEnterpriseForm';
 import ApiKeysManager from '../components/ApiKeysManager';
+import EnterpriseMemberManager from '../components/EnterpriseMemberManager';
 
 const SettingsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -229,6 +230,15 @@ const SettingsPage: React.FC = () => {
 
           {!enterprise && user && (
             <CreateEnterpriseForm onSuccess={loadEnterprise} />
+          )}
+
+          {enterprise && (
+            <EnterpriseMemberManager
+              enterpriseId={enterprise._id}
+              isAdmin={isAdmin}
+              members={enterprise.members}
+              onUpdate={loadEnterprise}
+            />
           )}
 
           {enterprise && (

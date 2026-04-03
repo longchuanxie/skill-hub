@@ -17,7 +17,9 @@
     "none": "无",
     "yes": "是",
     "no": "否",
-    "readOnly": "只读"
+    "readOnly": "只读",
+    "list": "列表",
+    "timeline": "时间线"
   },
   "nav": {
     "home": "首页",
@@ -529,6 +531,7 @@
     "content": "内容",
     "variables": "变量",
     "noVariables": "无变量",
+    "changelog": "变更日志",
     "characters": "字符",
     "changes": "处变更",
     "noChanges": "无变更",
@@ -566,7 +569,29 @@
     "deselect": "取消选择",
     "totalCount": "共 {{count}} 个版本",
     "selectedCount": "已选择 {{count}} 个",
-    "download": "下载"
+    "timeline": "时间线",
+    "comparison": "对比",
+    "selectVersions": "选择版本进行对比",
+    "download": "下载",
+    "sideBySide": "并排对比",
+    "inline": "行内对比",
+    "cancelCompare": "取消对比",
+    "unknownUser": "未知用户",
+    "sortBy": "排序方式",
+    "createdAt": "创建时间",
+    "versionNumber": "版本号",
+    "modifiedBy": "修改者",
+    "newestFirst": "最新优先",
+    "oldestFirst": "最旧优先",
+    "ascending": "升序",
+    "descending": "降序",
+    "selectFilesToCompare": "选择要对比的文件",
+    "selected": "已选中",
+    "selectModifiedOnly": "仅选择修改的文件",
+    "loadingDiff": "加载差异列表...",
+    "loadingFileContents": "加载文件内容...",
+    "noFilesSelected": "请选择要对比的文件",
+    "files": "文件"
   },
   "onlineTest": {
     "title": "在线测试",
@@ -640,5 +665,88 @@
     "searchFiles": "搜索文件...",
     "allTypes": "全部类型",
     "noFilesFound": "没有找到文件"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "管理控制台",
+      "subtitle": "管理用户、企业和监控平台活动",
+      "totalUsers": "总用户数",
+      "totalEnterprises": "总企业数",
+      "totalSkills": "总技能数",
+      "totalPrompts": "总提示词数",
+      "activeUsers": "活跃用户（近7天）",
+      "pendingApprovals": "待审批",
+      "today": "今日",
+      "userManagement": "用户管理",
+      "userManagementDesc": "查看和管理平台上的所有用户",
+      "goToUsers": "前往用户管理",
+      "enterpriseManagement": "企业管理",
+      "enterpriseManagementDesc": "查看和管理所有企业",
+      "goToEnterprises": "前往企业管理"
+    },
+    "users": {
+      "title": "用户管理",
+      "searchUsers": "搜索用户...",
+      "noUsersFound": "没有找到用户",
+      "id": "ID",
+      "username": "用户名",
+      "email": "邮箱",
+      "role": "角色",
+      "enterprise": "企业",
+      "memberSince": "加入时间",
+      "actions": "操作",
+      "editRole": "编辑角色",
+      "deleteUser": "删除用户",
+      "confirmDelete": "确定要删除此用户吗？",
+      "roleOptions": {
+        "admin": "管理员",
+        "enterprise_admin": "企业管理员",
+        "developer": "开发者",
+        "user": "普通用户"
+      },
+      "roleUpdated": "角色更新成功",
+      "updateFailed": "更新失败",
+      "userDeleted": "用户删除成功",
+      "deleteFailed": "删除失败"
+    },
+    "enterprises": {
+      "title": "企业管理",
+      "searchEnterprises": "搜索企业...",
+      "noEnterprisesFound": "没有找到企业",
+      "id": "ID",
+      "name": "企业名称",
+      "description": "描述",
+      "owner": "所有者",
+      "memberCount": "成员数量",
+      "createdAt": "创建时间",
+      "actions": "操作",
+      "viewMembers": "查看成员",
+      "deleteEnterprise": "删除企业",
+      "confirmDelete": "确定要删除此企业吗？",
+      "enterpriseDeleted": "企业删除成功",
+      "deleteFailed": "删除失败",
+      "members": {
+        "title": "企业成员",
+        "searchMembers": "搜索成员...",
+        "noMembersFound": "没有找到成员",
+        "id": "ID",
+        "username": "用户名",
+        "email": "邮箱",
+        "role": "角色",
+        "joinedAt": "加入时间",
+        "actions": "操作",
+        "removeMember": "移除成员",
+        "confirmRemove": "确定要移除此成员吗？",
+        "memberRemoved": "成员移除成功",
+        "removeFailed": "移除失败",
+        "inviteMember": "邀请成员",
+        "inviteSuccess": "邀请已发送",
+        "inviteFailed": "邀请发送失败",
+        "roleOptions": {
+          "admin": "管理员",
+          "member": "成员"
+        }
+      }
+    }
   }
 }

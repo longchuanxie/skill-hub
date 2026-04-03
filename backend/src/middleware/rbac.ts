@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
 
-type Role = 'admin' | 'enterprise_admin' | 'developer' | 'user';
+type Role = 'super_admin' | 'admin' | 'audit_admin' | 'enterprise_admin' | 'developer' | 'user';
 
 export const requireRole = (...roles: Role[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
@@ -19,6 +19,7 @@ export const requireRole = (...roles: Role[]) => {
   };
 };
 
-export const requireAdmin = requireRole('admin');
-export const requireEnterpriseAdmin = requireRole('admin', 'enterprise_admin');
-export const requireDeveloper = requireRole('admin', 'enterprise_admin', 'developer');
+export const requireAdmin = requireRole('super_admin', 'admin', 'audit_admin');
+export const requireEnterpriseAdmin = requireRole('super_admin', 'admin', 'enterprise_admin');
+export const requireDeveloper = requireRole('super_admin', 'admin', 'enterprise_admin', 'developer');
+export const requireSuperAdmin = requireRole('super_admin');

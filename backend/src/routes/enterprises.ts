@@ -6,6 +6,10 @@ import {
   getMyEnterprise, 
   updateEnterprise,
   inviteMember,
+  getInvitations,
+  cancelInvitation,
+  acceptInvitation,
+  declineInvitation,
   removeMember,
   updateMemberRole,
   leaveEnterprise,
@@ -30,6 +34,8 @@ router.get('/my', authenticate, getMyEnterprise);
 router.get('/:id', authenticate, getEnterprise);
 router.put('/:id', authenticate, enterpriseLogoUpload, updateEnterprise);
 router.post('/:id/invite', authenticate, inviteMember);
+router.get('/:id/invitations', authenticate, getInvitations);
+router.delete('/:id/invitations/:invitationId', authenticate, cancelInvitation);
 router.delete('/:id/members/:memberId', authenticate, removeMember);
 router.put('/:id/members/:memberId', authenticate, updateMemberRole);
 router.post('/leave', authenticate, leaveEnterprise);

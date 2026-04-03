@@ -10,6 +10,7 @@ import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { enterpriseMiddleware } from './middleware/enterpriseMiddleware';
 import { initializeEnterpriseContext } from './config/enterpriseContext';
+import { getLocalPath, getBaseUrl } from './config/storage';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import skillRoutes from './routes/skills';
@@ -33,13 +34,16 @@ import permissionsRoutes from './routes/permissions';
 import rateLimitRoutes from './routes/rateLimits';
 import searchRoutes from './routes/search';
 import recommendationRoutes from './routes/recommendations';
+import adminRoutes from './routes/admin';
+import invitationRoutes from './routes/invitation';
+import { initializeSuperAdmin } from './utils/initSuperAdmin';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: [process.env.CORS_ORIGIN || 'http://localhost:5173', 'http://localhost:5175', 'http://localhost:5174'],
   credentials: true,
 }));
 
@@ -65,7 +69,7 @@ app.use(morgan('combined', { stream: { write: (message) => logger.info(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.resolve(getLocalPath())));
 
 initializeEnterpriseContext();
 
@@ -108,6 +112,16 @@ app.use('/api', permissionsRoutes);
 app.use('/api/rate-limit', rateLimitRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/recommendations', recommendationRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/invitation', invitationRoutes);
+
+if (process.env.NODE_ENV === 'production') {
+  const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req: Request, res: Response) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+}
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Not Found' });
@@ -124,8 +138,19 @@ logger.info('Starting server...', {
 });
 
 mongoose.connect(MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     logger.info('Connected to MongoDB', { uri: MONGODB_URI.replace(/\/\/.*@/, '//****@') });
+    
+    // 初始化超级管理员
+    try {
+      await initializeSuperAdmin();
+    } catch (error) {
+      logger.error('Failed to initialize super admin', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    
     app.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`, { 
         port: PORT, 

@@ -7,6 +7,8 @@ import {
   addVersionTag,
   deleteVersionTag,
   compareVersions,
+  compareVersionsDetailed,
+  getVersionFileContent,
   downloadVersion
 } from '../controllers/versionController';
 import { authenticate, optionalAuth } from '../middleware/auth';
@@ -14,6 +16,8 @@ import { authenticate, optionalAuth } from '../middleware/auth';
 const router = express.Router();
 
 router.get('/:resourceType/:resourceId/compare', compareVersions);
+router.get('/:resourceType/:resourceId/compare/detailed', compareVersionsDetailed);
+router.get('/:resourceType/:resourceId/:version/files/:filePath(*)', getVersionFileContent);
 router.get('/:resourceType/:resourceId/:version/download', optionalAuth, downloadVersion);
 router.get('/:resourceType/:resourceId', getVersions);
 router.get('/:resourceType/:resourceId/:version', getVersion);

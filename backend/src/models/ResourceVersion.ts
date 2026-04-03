@@ -18,6 +18,18 @@ export interface IResourceVersion extends Document {
   createdBy: Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  fileManifest?: {
+    totalFiles: number;
+    totalSize: number;
+    files: Array<{
+      path: string;
+      name: string;
+      size: number;
+      checksum: string;
+    }>;
+    checksum: string;
+  };
+  comparisonStatus?: 'pending' | 'completed' | 'failed';
 }
 
 const resourceVersionSchema = new Schema<IResourceVersion>({
@@ -64,6 +76,22 @@ const resourceVersionSchema = new Schema<IResourceVersion>({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  fileManifest: {
+    totalFiles: Number,
+    totalSize: Number,
+    files: [{
+      path: String,
+      name: String,
+      size: Number,
+      checksum: String,
+    }],
+    checksum: String,
+  },
+  comparisonStatus: {
+    type: String,
+    enum: ['pending', 'completed', 'failed'],
+    default: 'pending',
   },
 }, {
   timestamps: true,

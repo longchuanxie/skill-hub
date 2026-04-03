@@ -174,17 +174,17 @@ const SkillCard: React.FC<SkillCardProps> = ({ skill, onFavoriteChange, onLikeCh
   return (
     <Link to={`/skills/${skill._id}`}>
       <Card className="hover:shadow-lg transition-shadow duration-200 h-full group">
-        <CardContent className="p-5">
+        <CardContent className="p-4 sm:p-5">
           <div className="flex items-start justify-between mb-3">
-            <h3 className="text-lg font-bold text-black line-clamp-1 flex items-center gap-2">
-              <svg className="w-5 h-5 text-black flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <h3 className="text-base sm:text-lg font-bold text-black line-clamp-1 flex items-center gap-2">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-black flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
               {skill.name}
             </h3>
             <Badge 
               variant="outline" 
-              className="text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 transition-colors font-medium"
+              className="text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 transition-colors font-medium flex-shrink-0"
             >
               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
@@ -193,7 +193,7 @@ const SkillCard: React.FC<SkillCardProps> = ({ skill, onFavoriteChange, onLikeCh
             </Badge>
           </div>
           
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+          <p className="text-xs sm:text-sm text-gray-600 mb-3 line-clamp-2">
             {skill.description}
           </p>
           
@@ -219,23 +219,23 @@ const SkillCard: React.FC<SkillCardProps> = ({ skill, onFavoriteChange, onLikeCh
                 ) : null}
                 <AvatarFallback>{skill.owner?.username?.slice(0, 2).toUpperCase() || 'UK'}</AvatarFallback>
               </Avatar>
-              <span className="text-xs text-gray-600 font-medium">{skill.owner?.username || 'Unknown'}</span>
+              <span className="text-xs text-gray-600 font-medium truncate max-w-[100px] sm:max-w-none">{skill.owner?.username || 'Unknown'}</span>
             </div>
             
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 flex-shrink-0">
               <div className="flex">{renderStars(skill.averageRating)}</div>
               <span className="text-xs text-gray-500 font-medium">({skill.ratingsCount})</span>
             </div>
           </div>
           
           <div className="flex items-center justify-between mt-3 pt-3 border-t-2 border-gray-200">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <button
                 onClick={handleDownload}
                 className="flex items-center space-x-1 text-gray-500 hover:text-gray-800 transition-colors"
                 title="Download"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 <span className="text-xs">{skill.downloads}</span>

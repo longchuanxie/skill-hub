@@ -36,6 +36,7 @@ export enum ErrorCode {
   USER_NOT_FOUND = 'USER_NOT_FOUND',
   FILE_NOT_FOUND = 'FILE_NOT_FOUND',
   ENTERPRISE_NOT_FOUND = 'ENTERPRISE_NOT_FOUND',
+  INVITATION_NOT_FOUND = 'INVITATION_NOT_FOUND',
   
   // 业务逻辑错误 (BIZ_xxx)
   PUBLIC_SKILL_REQUIRES_FILE = 'PUBLIC_SKILL_REQUIRES_FILE',
@@ -209,6 +210,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
     zh: '企业不存在',
     en: 'Enterprise not found'
   },
+  [ErrorCode.INVITATION_NOT_FOUND]: {
+    zh: '邀请不存在',
+    en: 'Invitation not found'
+  },
   
   // 业务逻辑错误
   [ErrorCode.PUBLIC_SKILL_REQUIRES_FILE]: {
@@ -344,6 +349,7 @@ function getStatusCode(code: ErrorCode): number {
     ErrorCode.USER_NOT_FOUND,
     ErrorCode.FILE_NOT_FOUND,
     ErrorCode.ENTERPRISE_NOT_FOUND,
+    ErrorCode.INVITATION_NOT_FOUND,
   ];
   
   const bizCodes = [
