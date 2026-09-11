@@ -53,7 +53,7 @@ export function getDefaultConfig() {
   return {
     public: {
       windowSize: parseInt(process.env.RATE_LIMIT_PUBLIC_WINDOW || '60000', 10),
-      maxRequests: parseInt(process.env.RATE_LIMIT_PUBLIC_MAX || '10', 10),
+      maxRequests: parseInt(process.env.RATE_LIMIT_PUBLIC_MAX || '100', 10),
     },
     auth: {
       windowSize: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW || '60000', 10),

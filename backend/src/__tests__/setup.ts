@@ -5,6 +5,8 @@ import mongoose from 'mongoose';
 // any test module (and therefore the app) is imported.
 process.env.JWT_SECRET = 'test-secret';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+// Keep rate limiting off so high-volume integration tests never see 429s.
+process.env.RATE_LIMIT_ENABLED = 'false';
 
 let mongoServer: MongoMemoryServer;
 

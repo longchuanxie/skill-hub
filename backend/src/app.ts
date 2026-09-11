@@ -31,7 +31,7 @@ import customPagesRoutes from './routes/customPages';
 import versionsRoutes from './routes/versions';
 import docsRoutes from './routes/docs';
 import permissionsRoutes from './routes/permissions';
-import rateLimitRoutes from './routes/rateLimits';
+import rateLimitRoutes, { createMatchedRateLimitMiddleware } from './routes/rateLimits';
 import searchRoutes from './routes/search';
 import recommendationRoutes from './routes/recommendations';
 import adminRoutes from './routes/admin';
@@ -102,6 +102,13 @@ app.get('/api/health', async (req: Request, res: Response) => {
         },
   });
 });
+
+// Per-route rate limiting based on the rateLimitRoutes table (auth/sensitive/
+// external/authenticated). Unmatched routes pass through untouched.
+app.use(
+  '/api',
+  createMatchedRateLimitMiddleware((req) => req.path),
+);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

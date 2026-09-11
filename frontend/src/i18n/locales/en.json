@@ -23,6 +23,9 @@
   },
   "nav": {
     "home": "Home",
+    "toggleTheme": "Toggle theme",
+    "darkMode": "Switch to dark mode",
+    "lightMode": "Switch to light mode",
     "skills": "Skills",
     "prompts": "Prompts",
     "myResources": "My Resources",

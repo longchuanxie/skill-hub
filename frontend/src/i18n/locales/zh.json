@@ -23,6 +23,9 @@
   },
   "nav": {
     "home": "首页",
+    "toggleTheme": "切换主题",
+    "darkMode": "切换到暗色模式",
+    "lightMode": "切换到亮色模式",
     "skills": "技能",
     "prompts": "提示词",
     "myResources": "我的资源",

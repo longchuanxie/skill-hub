@@ -2,23 +2,6 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { ApiType } from '../middleware/rateLimit/RateLimitOptions';
 import { rateLimitManager } from '../middleware/rateLimit';
 
-export function applyRouteRateLimits(): void {
-  // Lazy requires avoid circular imports with the route modules.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const authRouter = require('./auth').default;
-
-  if (authRouter) {
-    authRouter.stack = authRouter.stack.filter((layer: any) => {
-      return (
-        !layer.route ||
-        !layer.route.path.match(
-          /^\/(login|register|send-code|verify-code|forgot-password|reset-password)$/,
-        )
-      );
-    });
-  }
-}
-
 export const rateLimitRoutes: { path: string; method: string; apiType: ApiType }[] = [
   { path: '/auth/login', method: 'POST', apiType: ApiType.PUBLIC },
   { path: '/auth/register', method: 'POST', apiType: ApiType.PUBLIC },
