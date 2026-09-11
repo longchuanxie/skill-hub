@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
-import { ErrorCode, ERROR_MESSAGES, getErrorMessage } from '../utils/errors';
+import { AppError, ErrorCode, ERROR_MESSAGES, getErrorMessage, createErrorResponse } from '../utils/errors';
 
 export interface ApiError extends Error {
   statusCode?: number;
@@ -16,15 +16,40 @@ const getAcceptLanguage = (req: Request): 'zh' | 'en' => {
   return 'zh';
 };
 
+// All error responses share the flat { code, message, statusCode } contract
+// produced by createErrorResponse in utils/errors.ts.
 export const errorHandler = (
   err: ApiError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
-  const statusCode = err.statusCode || 500;
   const lang = getAcceptLanguage(req);
-  const message = err.isOperational ? err.message : (lang === 'zh' ? '服务器内部错误' : 'Internal Server Error');
+  const knownCode = err.code && err.code in ERROR_MESSAGES ? err.code : undefined;
+
+  let code: ErrorCode;
+  let message: string;
+  let statusCode: number;
+  let details: unknown;
+
+  if (knownCode && err instanceof AppError) {
+    code = knownCode;
+    message = err.message || getErrorMessage(code, lang);
+    statusCode = err.statusCode;
+    details = err.details;
+  } else if (knownCode) {
+    const mapped = createErrorResponse(knownCode);
+    code = mapped.code;
+    message = err.isOperational ? err.message : mapped.message;
+    statusCode = err.statusCode ?? mapped.statusCode;
+    details = err.isOperational ? undefined : mapped.details;
+  } else {
+    const mapped = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    code = mapped.code;
+    message = mapped.message;
+    statusCode = err.statusCode && err.statusCode < 500 ? err.statusCode : mapped.statusCode;
+    details = undefined;
+  }
 
   logger.error({
     message: err.message,
@@ -33,71 +58,25 @@ export const errorHandler = (
     path: req.path,
     method: req.method,
     ip: req.ip,
-    isOperational: err.isOperational,
-    code: err.code,
+    isOperational: err.isOperational ?? err instanceof AppError,
+    code,
   });
 
-  const errorResponse: any = {
-    success: false,
-    error: {
-      message,
-    },
-  };
+  const errorResponse: {
+    code: ErrorCode;
+    message: string;
+    statusCode: number;
+    details?: unknown;
+    stack?: string;
+  } = { code, message, statusCode };
 
-  if (err.code !== undefined) {
-    errorResponse.error.code = err.code;
-    errorResponse.error.messageZh = ERROR_MESSAGES[err.code]?.zh || '未知错误';
-    errorResponse.error.messageEn = ERROR_MESSAGES[err.code]?.en || 'Unknown error';
+  if (details !== undefined) {
+    errorResponse.details = details;
   }
 
   if (process.env.NODE_ENV === 'development') {
-    errorResponse.error.stack = err.stack;
+    errorResponse.stack = err.stack;
   }
 
   res.status(statusCode).json(errorResponse);
 };
-
-export class AppError extends Error {
-  statusCode: number;
-  isOperational: boolean;
-  code?: ErrorCode;
-
-  constructor(message: string, statusCode: number, code?: ErrorCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-    this.code = code;
-
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
-
-export class ValidationError extends AppError {
-  constructor(message: string) {
-    super(message, 400, ErrorCode.INVALID_INPUT);
-  }
-}
-
-export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Unauthorized') {
-    super(message, 401, ErrorCode.UNAUTHORIZED);
-  }
-}
-
-export class ForbiddenError extends AppError {
-  constructor(message: string = 'Forbidden') {
-    super(message, 403, ErrorCode.FORBIDDEN);
-  }
-}
-
-export class NotFoundError extends AppError {
-  constructor(message: string = 'Not Found') {
-    super(message, 404, ErrorCode.RESOURCE_NOT_FOUND);
-  }
-}
-
-export class ConflictError extends AppError {
-  constructor(message: string, code?: ErrorCode) {
-    super(message, 409, code || ErrorCode.DUPLICATE_RESOURCE);
-  }
-}

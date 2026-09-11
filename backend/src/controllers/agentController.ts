@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { Agent } from '../models/Agent';
 import { AuthRequest } from '../middleware/auth';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
 
 export const createAgent = async (req: AuthRequest, res: Response) => {
   try {
@@ -18,7 +19,7 @@ export const createAgent = async (req: AuthRequest, res: Response) => {
     await agent.save();
     res.status(201).json({ agent, apiKey: agent.apiKey });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create agent' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -52,7 +53,7 @@ export const getAgents = async (req: AuthRequest, res: Response) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get agents' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -62,18 +63,18 @@ export const getAgentById = async (req: AuthRequest, res: Response) => {
     const agent = await Agent.findById(id);
     
     if (!agent) {
-      res.status(404).json({ error: 'Agent not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.AGENT_NOT_FOUND));
       return;
     }
 
     if ((agent.owner as any)?.toString() !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
     res.json({ ...agent.toObject(), apiKey: undefined });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get agent' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -84,12 +85,12 @@ export const updateAgent = async (req: AuthRequest, res: Response) => {
 
     const agent = await Agent.findById(id);
     if (!agent) {
-      res.status(404).json({ error: 'Agent not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.AGENT_NOT_FOUND));
       return;
     }
 
     if ((agent.owner as any)?.toString() !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
@@ -97,7 +98,7 @@ export const updateAgent = async (req: AuthRequest, res: Response) => {
     await agent.save();
     res.json({ ...agent.toObject(), apiKey: undefined });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update agent' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -107,19 +108,19 @@ export const deleteAgent = async (req: AuthRequest, res: Response) => {
 
     const agent = await Agent.findById(id);
     if (!agent) {
-      res.status(404).json({ error: 'Agent not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.AGENT_NOT_FOUND));
       return;
     }
 
     if ((agent.owner as any)?.toString() !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
     await agent.deleteOne();
     res.json({ message: 'Agent deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete agent' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -129,12 +130,12 @@ export const regenerateAgentKey = async (req: AuthRequest, res: Response) => {
 
     const agent = await Agent.findById(id);
     if (!agent) {
-      res.status(404).json({ error: 'Agent not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.AGENT_NOT_FOUND));
       return;
     }
 
     if ((agent.owner as any)?.toString() !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
@@ -142,7 +143,7 @@ export const regenerateAgentKey = async (req: AuthRequest, res: Response) => {
     await agent.save();
     res.json({ apiKey: newApiKey });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to regenerate API key' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -152,17 +153,17 @@ export const getAgentApiKey = async (req: AuthRequest, res: Response) => {
 
     const agent = await Agent.findById(id);
     if (!agent) {
-      res.status(404).json({ error: 'Agent not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.AGENT_NOT_FOUND));
       return;
     }
 
     if ((agent.owner as any)?.toString() !== req.user?.userId) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
     res.json({ apiKey: agent.apiKey });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get API key' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };

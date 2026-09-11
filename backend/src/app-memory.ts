@@ -30,6 +30,7 @@ import docsRoutes from './routes/docs';
 import permissionsRoutes from './routes/permissions';
 import searchRoutes from './routes/search';
 import recommendationRoutes from './routes/recommendations';
+import { ErrorCode, createErrorResponse } from './utils/errors';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3001;
@@ -96,7 +97,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 
 app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: 'Not Found' });
+  res.status(404).json(createErrorResponse(ErrorCode.RESOURCE_NOT_FOUND));
 });
 
 app.use(errorHandler);

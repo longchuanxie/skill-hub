@@ -3,6 +3,9 @@ import { AuthRequest } from '../middleware/auth';
 import { TestCase } from '../models/TestCase';
 import { TestResult } from '../models/TestResult';
 import { Skill } from '../models/Skill';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('onlineTestController');
 
 export const createTestCase = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -51,7 +54,7 @@ export const createTestCase = async (req: AuthRequest, res: Response): Promise<v
       data: testCase
     });
   } catch (error) {
-    console.error('Create test case error:', error);
+    logger.error('Create test case error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create test case'
@@ -91,7 +94,7 @@ export const getTestCases = async (req: AuthRequest, res: Response): Promise<voi
       data: testCases
     });
   } catch (error) {
-    console.error('Get test cases error:', error);
+    logger.error('Get test cases error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch test cases'
@@ -145,7 +148,7 @@ export const updateTestCase = async (req: AuthRequest, res: Response): Promise<v
       data: testCase
     });
   } catch (error) {
-    console.error('Update test case error:', error);
+    logger.error('Update test case error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update test case'
@@ -197,7 +200,7 @@ export const deleteTestCase = async (req: AuthRequest, res: Response): Promise<v
       message: 'Test case deleted'
     });
   } catch (error) {
-    console.error('Delete test case error:', error);
+    logger.error('Delete test case error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete test case'
@@ -254,7 +257,7 @@ export const executeTest = async (req: AuthRequest, res: Response): Promise<void
       message: 'Test execution started'
     });
   } catch (error) {
-    console.error('Execute test error:', error);
+    logger.error('Execute test error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to execute test'
@@ -301,7 +304,7 @@ export const getTestResult = async (req: AuthRequest, res: Response): Promise<vo
       data: testResult
     });
   } catch (error) {
-    console.error('Get test result error:', error);
+    logger.error('Get test result error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch test result'
@@ -348,7 +351,7 @@ export const getTestLogs = async (req: AuthRequest, res: Response): Promise<void
       data: testResult.logs
     });
   } catch (error) {
-    console.error('Get test logs error:', error);
+    logger.error('Get test logs error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch test logs'

@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('trendsController');
 
 interface TrendsQuery {
   type?: 'skills' | 'prompts' | 'combined';
@@ -62,7 +65,7 @@ export const getTrends = async (req: Request, res: Response) => {
       createdAt: { $gte: startDate }
     };
 
-    console.log(`[Trends API] 开始获取趋势数据: type=${type}, sort=${sort}, limit=${limitNum}, timeRange=${timeRange}`);
+    logger.info(`[Trends API] 开始获取趋势数据: type=${type}, sort=${sort}, limit=${limitNum}, timeRange=${timeRange}`);
 
     let skills: any[] = [];
     let prompts: any[] = [];
@@ -89,7 +92,7 @@ export const getTrends = async (req: Request, res: Response) => {
         updatedAt: skill.updatedAt
       }));
 
-      console.log(`[Trends API] 找到 ${skills.length} 个技能`);
+      logger.info(`[Trends API] 找到 ${skills.length} 个技能`);
     }
 
     if (type === 'prompts' || type === 'combined') {
@@ -114,7 +117,7 @@ export const getTrends = async (req: Request, res: Response) => {
         updatedAt: prompt.updatedAt
       }));
 
-      console.log(`[Trends API] 找到 ${prompts.length} 个提示词`);
+      logger.info(`[Trends API] 找到 ${prompts.length} 个提示词`);
     }
 
     let combined: any[] = [];
@@ -146,11 +149,11 @@ export const getTrends = async (req: Request, res: Response) => {
       }
     };
 
-    console.log(`[Trends API] 返回数据: skills=${skills.length}, prompts=${prompts.length}, combined=${combined.length}`);
+    logger.info(`[Trends API] 返回数据: skills=${skills.length}, prompts=${prompts.length}, combined=${combined.length}`);
 
     res.json(response);
   } catch (error) {
-    console.error('[Trends API] 获取趋势数据时出错:', error);
+    logger.error('[Trends API] 获取趋势数据时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch trends data'

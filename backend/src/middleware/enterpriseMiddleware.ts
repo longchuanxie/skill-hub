@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { enterpriseContext } from '../config/enterpriseContext';
 import { Enterprise } from '../models/Enterprise';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('enterpriseMiddleware');
 
 export interface EnterpriseRequest extends Request {
   enterpriseContext?: {
@@ -29,7 +32,7 @@ export const enterpriseMiddleware = async (
           enterpriseContext.setEnterprise(enterprise);
         }
       } catch (error) {
-        console.error('[EnterpriseMiddleware] Failed to load enterprise:', error);
+        logger.error('[EnterpriseMiddleware] Failed to load enterprise:', error);
       }
     }
   }

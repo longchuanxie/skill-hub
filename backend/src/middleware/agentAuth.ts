@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { Agent } from '../models/Agent';
 import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
 
 export interface AgentRequest extends Request {
   agent?: any;
@@ -16,13 +17,13 @@ export const authenticateAgent = async (
     const apiKey = req.headers['x-api-key'] as string;
     
     if (!apiKey) {
-      res.status(401).json({ error: 'API key required' });
+      res.status(401).json(createErrorResponse(ErrorCode.TOKEN_MISSING));
       return;
     }
 
     const agent = await Agent.findOne({ apiKey, isEnabled: true });
     if (!agent) {
-      res.status(401).json({ error: 'Invalid API key' });
+      res.status(401).json(createErrorResponse(ErrorCode.UNAUTHORIZED));
       return;
     }
 
@@ -33,7 +34,7 @@ export const authenticateAgent = async (
     req.agent = agent;
     next();
   } catch (error) {
-    res.status(500).json({ error: 'Authentication failed' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -44,7 +45,7 @@ export const checkAgentPermission = (resource: 'skill' | 'prompt') => {
       const agent = req.agent;
 
       if (!agent.permissions.canRead) {
-        res.status(403).json({ error: 'Read permission denied' });
+        res.status(403).json(createErrorResponse(ErrorCode.READ_PERMISSION_DENIED));
         return;
       }
 
@@ -56,7 +57,7 @@ export const checkAgentPermission = (resource: 'skill' | 'prompt') => {
       }
 
       if (!resourceDoc) {
-        res.status(404).json({ error: 'Resource not found' });
+        res.status(404).json(createErrorResponse(ErrorCode.RESOURCE_NOT_FOUND));
         return;
       }
 
@@ -67,13 +68,13 @@ export const checkAgentPermission = (resource: 'skill' | 'prompt') => {
       const isPublic = resourceDoc.visibility === 'public';
 
       if (!isOwner && !isSameEnterprise && !isPublic) {
-        res.status(403).json({ error: 'Access denied' });
+        res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
         return;
       }
 
       next();
     } catch (error) {
-      res.status(500).json({ error: 'Permission check failed' });
+      res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
     }
   };
 };

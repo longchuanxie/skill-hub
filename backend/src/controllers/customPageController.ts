@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { CustomPage } from '../models/CustomPage';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('customPageController');
 
 export const getAllPages = async (req: Request, res: Response) => {
   try {
@@ -9,7 +12,7 @@ export const getAllPages = async (req: Request, res: Response) => {
       data: pages
     });
   } catch (error) {
-    console.error('获取所有页面时出错:', error);
+    logger.error('获取所有页面时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch pages'
@@ -40,7 +43,7 @@ export const getPageByKey = async (req: Request, res: Response) => {
       data: page
     });
   } catch (error) {
-    console.error('获取页面时出错:', error);
+    logger.error('获取页面时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch page'
@@ -74,7 +77,7 @@ export const createPage = async (req: Request, res: Response) => {
       data: page
     });
   } catch (error) {
-    console.error('创建页面时出错:', error);
+    logger.error('创建页面时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create page'
@@ -105,7 +108,7 @@ export const updatePage = async (req: Request, res: Response) => {
       data: page
     });
   } catch (error) {
-    console.error('更新页面时出错:', error);
+    logger.error('更新页面时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update page'
@@ -131,7 +134,7 @@ export const deletePage = async (req: Request, res: Response) => {
       message: 'Page deleted successfully'
     });
   } catch (error) {
-    console.error('删除页面时出错:', error);
+    logger.error('删除页面时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete page'

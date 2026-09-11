@@ -1,3 +1,6 @@
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('enterpriseContext');
 export interface EnterpriseConfig {
   enterpriseId: string | null;
   mode: 'multi-tenant' | 'single-tenant';
@@ -38,7 +41,7 @@ class EnterpriseContext {
       this.config.mode = 'multi-tenant';
     }
 
-    console.log(`[EnterpriseContext] Initialized in ${this.config.mode} mode`, {
+    logger.info(`[EnterpriseContext] Initialized in ${this.config.mode} mode`, {
       enterpriseId: this.config.enterpriseId,
     });
   }

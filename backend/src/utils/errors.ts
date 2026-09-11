@@ -17,6 +17,7 @@ export enum ErrorCode {
   ACCESS_DENIED = 'ACCESS_DENIED',
   NOT_AUTHORIZED = 'NOT_AUTHORIZED',
   READ_PERMISSION_DENIED = 'READ_PERMISSION_DENIED',
+  WRITE_PERMISSION_DENIED = 'WRITE_PERMISSION_DENIED',
   
   // 验证相关错误 (VAL_xxx)
   INVALID_INPUT = 'INVALID_INPUT',
@@ -37,6 +38,7 @@ export enum ErrorCode {
   FILE_NOT_FOUND = 'FILE_NOT_FOUND',
   ENTERPRISE_NOT_FOUND = 'ENTERPRISE_NOT_FOUND',
   INVITATION_NOT_FOUND = 'INVITATION_NOT_FOUND',
+  AGENT_NOT_FOUND = 'AGENT_NOT_FOUND',
   
   // 业务逻辑错误 (BIZ_xxx)
   PUBLIC_SKILL_REQUIRES_FILE = 'PUBLIC_SKILL_REQUIRES_FILE',
@@ -52,6 +54,11 @@ export enum ErrorCode {
   NO_FILE_UPLOADED = 'NO_FILE_UPLOADED',
   NO_FILE_AVAILABLE = 'NO_FILE_AVAILABLE',
   DOWNLOAD_FAILED = 'DOWNLOAD_FAILED',
+  USER_ALREADY_MEMBER = 'USER_ALREADY_MEMBER',
+  INVITATION_PENDING_EXISTS = 'INVITATION_PENDING_EXISTS',
+  INVITATION_ALREADY_PROCESSED = 'INVITATION_ALREADY_PROCESSED',
+  INVITATION_EXPIRED = 'INVITATION_EXPIRED',
+  INVITATION_EMAIL_MISMATCH = 'INVITATION_EMAIL_MISMATCH',
   
   // 服务器错误 (SRV_xxx)
   INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
@@ -146,6 +153,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
     zh: '读取权限被拒绝',
     en: 'Read permission denied'
   },
+  [ErrorCode.WRITE_PERMISSION_DENIED]: {
+    zh: '写入权限被拒绝',
+    en: 'Write permission denied'
+  },
   
   // 验证相关错误
   [ErrorCode.INVALID_INPUT]: {
@@ -214,6 +225,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
     zh: '邀请不存在',
     en: 'Invitation not found'
   },
+  [ErrorCode.AGENT_NOT_FOUND]: {
+    zh: 'Agent不存在',
+    en: 'Agent not found'
+  },
   
   // 业务逻辑错误
   [ErrorCode.PUBLIC_SKILL_REQUIRES_FILE]: {
@@ -267,6 +282,26 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
   [ErrorCode.DOWNLOAD_FAILED]: {
     zh: '下载失败',
     en: 'Download failed'
+  },
+  [ErrorCode.USER_ALREADY_MEMBER]: {
+    zh: '该用户已是企业成员',
+    en: 'User is already a member of this enterprise'
+  },
+  [ErrorCode.INVITATION_PENDING_EXISTS]: {
+    zh: '该邮箱已有待处理的邀请',
+    en: 'A pending invitation already exists for this email'
+  },
+  [ErrorCode.INVITATION_ALREADY_PROCESSED]: {
+    zh: '邀请已被处理',
+    en: 'Invitation has already been processed'
+  },
+  [ErrorCode.INVITATION_EXPIRED]: {
+    zh: '邀请已过期',
+    en: 'Invitation has expired'
+  },
+  [ErrorCode.INVITATION_EMAIL_MISMATCH]: {
+    zh: '邀请邮箱与用户邮箱不匹配',
+    en: 'Invitation email does not match user email'
   },
   
   // 服务器错误
@@ -328,6 +363,7 @@ function getStatusCode(code: ErrorCode): number {
     ErrorCode.ACCESS_DENIED,
     ErrorCode.NOT_AUTHORIZED,
     ErrorCode.READ_PERMISSION_DENIED,
+    ErrorCode.WRITE_PERMISSION_DENIED,
   ];
   
   const valCodes = [
@@ -350,6 +386,7 @@ function getStatusCode(code: ErrorCode): number {
     ErrorCode.FILE_NOT_FOUND,
     ErrorCode.ENTERPRISE_NOT_FOUND,
     ErrorCode.INVITATION_NOT_FOUND,
+    ErrorCode.AGENT_NOT_FOUND,
   ];
   
   const bizCodes = [
@@ -366,6 +403,11 @@ function getStatusCode(code: ErrorCode): number {
     ErrorCode.NO_FILE_UPLOADED,
     ErrorCode.NO_FILE_AVAILABLE,
     ErrorCode.DOWNLOAD_FAILED,
+    ErrorCode.USER_ALREADY_MEMBER,
+    ErrorCode.INVITATION_PENDING_EXISTS,
+    ErrorCode.INVITATION_ALREADY_PROCESSED,
+    ErrorCode.INVITATION_EXPIRED,
+    ErrorCode.INVITATION_EMAIL_MISMATCH,
   ];
   
   const srvCodes = [

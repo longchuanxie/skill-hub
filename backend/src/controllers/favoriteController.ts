@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('favoriteController');
 
 export const favoriteController = {
   addFavorite: async (req: Request, res: Response): Promise<void> => {
@@ -52,7 +55,7 @@ export const favoriteController = {
         res.status(400).json({ message: 'Invalid type' });
       }
     } catch (error) {
-      console.error('Add favorite error:', error);
+      logger.error('Add favorite error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -106,7 +109,7 @@ export const favoriteController = {
         res.status(400).json({ message: 'Invalid type' });
       }
     } catch (error) {
-      console.error('Remove favorite error:', error);
+      logger.error('Remove favorite error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -138,7 +141,7 @@ export const favoriteController = {
         res.status(400).json({ message: 'Invalid type' });
       }
     } catch (error) {
-      console.error('Check favorite error:', error);
+      logger.error('Check favorite error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -168,7 +171,7 @@ export const favoriteController = {
         res.status(400).json({ message: 'Invalid type' });
       }
     } catch (error) {
-      console.error('Get favorites error:', error);
+      logger.error('Get favorites error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   }

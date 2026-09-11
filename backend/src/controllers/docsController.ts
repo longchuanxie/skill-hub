@@ -1,4 +1,7 @@
 import { Response } from 'express';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('docsController');
 
 export const getApiDocs = async (req: any, res: Response) => {
   try {
@@ -333,7 +336,7 @@ export const getApiDocs = async (req: any, res: Response) => {
       data: apiDocs,
     });
   } catch (error) {
-    console.error('Error fetching API docs:', error);
+    logger.error('Error fetching API docs:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch API documentation',

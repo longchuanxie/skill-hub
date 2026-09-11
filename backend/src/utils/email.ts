@@ -95,7 +95,7 @@ export async function sendEmail(
       const config = getDefaultSMTPConfig();
       if (!config) {
         logger.warn('SMTP not configured, simulating email send', { to: options.to, subject: options.subject });
-        console.log(`\n[EMAIL SIMULATION] To: ${options.to}, Subject: ${options.subject}\n${options.text || options.html}\n`);
+        logger.info(`\n[EMAIL SIMULATION] To: ${options.to}, Subject: ${options.subject}\n${options.text || options.html}\n`);
         return { success: true, messageId: `simulated-${Date.now()}` };
       }
       fromEmail = config.fromEmail || config.user;

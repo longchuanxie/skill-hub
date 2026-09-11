@@ -14,8 +14,8 @@ const logger = createLogger('AdminInvitationController');
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: process.env.SMTP_USER || process.env.EMAIL_USER,
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
 });
 
@@ -73,7 +73,7 @@ export const createInvitation = async (req: AuthRequest, res: Response): Promise
     // 发送邀请邮件
     const invitationLink = `${process.env.FRONTEND_URL}/register/admin?code=${invitation.inviteCode}`;
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || process.env.EMAIL_USER,
       to: email,
       subject: 'SkillHub 管理员邀请',
       html: `

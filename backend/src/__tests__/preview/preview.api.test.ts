@@ -116,7 +116,7 @@ describe('Skill Preview API', () => {
         .get(`/api/skills/${skillId}/file-tree`)
         .expect(403);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
 
     it('should return 404 for non-existent skill', async () => {
@@ -125,7 +125,7 @@ describe('Skill Preview API', () => {
         .get(`/api/skills/${fakeId}/file-tree`)
         .expect(404);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
 
     it('should return 400 for skill without file', async () => {
@@ -144,7 +144,7 @@ describe('Skill Preview API', () => {
         .get(`/api/skills/${skillWithoutFile._id}/file-tree`)
         .expect(400);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
   });
 
@@ -188,7 +188,7 @@ describe('Skill Preview API', () => {
         .query({ path: 'README.md' })
         .expect(403);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
 
     it('should return 404 for non-existent skill', async () => {
@@ -198,7 +198,7 @@ describe('Skill Preview API', () => {
         .query({ path: 'README.md' })
         .expect(404);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
 
     it('should return 400 for skill without file', async () => {
@@ -218,7 +218,7 @@ describe('Skill Preview API', () => {
         .query({ path: 'README.md' })
         .expect(400);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
 
     it('should reject path traversal attempts', async () => {
@@ -227,7 +227,7 @@ describe('Skill Preview API', () => {
         .query({ path: '../../package.json' })
         .expect(404);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
 
     it('should reject deep path traversal attempts', async () => {
@@ -236,7 +236,7 @@ describe('Skill Preview API', () => {
         .query({ path: 'src/../../../../../../../../etc/passwd' })
         .expect(404);
 
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('code');
     });
   });
 });

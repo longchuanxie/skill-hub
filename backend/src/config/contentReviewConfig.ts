@@ -1,7 +1,3 @@
-import dotenv from 'dotenv';
-
-dotenv.config();
-
 export interface ContentReviewConfig {
   enabled: boolean;
   strictMode: boolean;

@@ -54,8 +54,9 @@ describe('Version Management API', () => {
           .get(`/api/versions/skill/${skillId}`)
           .expect(200);
 
-        expect(response.body).toHaveProperty('success', true);
-        expect(response.body).toHaveProperty('data');
+        expect(Array.isArray(response.body.versions)).toBe(true);
+        expect(response.body.versions.length).toBeGreaterThan(0);
+        expect(response.body.pagination).toBeDefined();
       });
     });
 

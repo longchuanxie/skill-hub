@@ -7,6 +7,9 @@ import { zipAnalyzerService } from '../services/ZipAnalyzerService';
 import path from 'path';
 import fs from 'fs';
 import AdmZip from 'adm-zip';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('versionController');
 
 export const getVersions = async (req: Request, res: Response) => {
   try {
@@ -47,7 +50,7 @@ export const getVersions = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('获取版本列表时出错:', error);
+    logger.error('获取版本列表时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch versions'
@@ -76,7 +79,7 @@ export const getVersion = async (req: Request, res: Response) => {
       data: versionData
     });
   } catch (error) {
-    console.error('获取版本详情时出错:', error);
+    logger.error('获取版本详情时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch version'
@@ -144,7 +147,7 @@ export const createVersion = async (req: AuthRequest, res: Response) => {
       data: newVersion
     });
   } catch (error) {
-    console.error('创建版本时出错:', error);
+    logger.error('创建版本时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create version'
@@ -211,7 +214,7 @@ export const rollbackVersion = async (req: AuthRequest, res: Response) => {
       message: 'Rolled back successfully'
     });
   } catch (error) {
-    console.error('回滚版本时出错:', error);
+    logger.error('回滚版本时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to rollback version'
@@ -270,7 +273,7 @@ export const addVersionTag = async (req: AuthRequest, res: Response) => {
       data: versionData
     });
   } catch (error) {
-    console.error('添加版本标签时出错:', error);
+    logger.error('添加版本标签时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to add tag'
@@ -326,7 +329,7 @@ export const deleteVersionTag = async (req: AuthRequest, res: Response) => {
       data: versionData
     });
   } catch (error) {
-    console.error('删除版本标签时出错:', error);
+    logger.error('删除版本标签时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete tag'
@@ -400,7 +403,7 @@ export const compareVersions = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('对比版本时出错:', error);
+    logger.error('对比版本时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to compare versions'
@@ -470,7 +473,7 @@ export const downloadVersion = async (req: AuthRequest, res: Response) => {
       res.send(buffer);
     });
   } catch (error) {
-    console.error('下载版本时出错:', error);
+    logger.error('下载版本时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to download version'
@@ -544,7 +547,7 @@ export const compareVersionsDetailed = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('详细对比版本时出错:', error);
+    logger.error('详细对比版本时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to compare versions in detail'
@@ -599,7 +602,7 @@ export const getVersionFileContent = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('获取版本文件内容时出错:', error);
+    logger.error('获取版本文件内容时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get file content'

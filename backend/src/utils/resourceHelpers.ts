@@ -6,6 +6,9 @@ import { zipAnalyzerService } from '../services/ZipAnalyzerService';
 import { getFileUrl } from '../middleware/upload';
 import path from 'path';
 import fs from 'fs';
+import { createLogger } from './logger';
+
+const logger = createLogger('resourceHelpers');
 
 export interface ResourceStatusResult {
   status: 'draft' | 'pending' | 'approved';
@@ -77,7 +80,7 @@ export async function createResourceVersion(params: {
       try {
         fileManifest = await zipAnalyzerService.extractManifest(filePath);
       } catch (error) {
-        console.error('Failed to extract file manifest:', error);
+        logger.error('Failed to extract file manifest:', error);
       }
     }
   }

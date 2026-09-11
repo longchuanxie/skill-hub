@@ -7,6 +7,7 @@ import { AuthRequest } from '../middleware/auth';
 import { getFileUrl } from '../middleware/upload';
 import { createLogger } from '../utils/logger';
 import crypto from 'crypto';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
 
 const logger = createLogger('EnterpriseController');
 
@@ -19,14 +20,14 @@ export const createEnterprise = async (req: AuthRequest, res: Response): Promise
     const existingEnterprise = await Enterprise.findOne({ owner: req.user?.userId });
     if (existingEnterprise) {
       logger.warn('Create enterprise failed - user already owns an enterprise', { userId: req.user?.userId });
-      res.status(400).json({ error: 'You already own an enterprise' });
+      res.status(400).json(createErrorResponse(ErrorCode.OPERATION_NOT_ALLOWED));
       return;
     }
 
     const existingName = await Enterprise.findOne({ name });
     if (existingName) {
       logger.warn('Create enterprise failed - name already exists', { name });
-      res.status(400).json({ error: 'Enterprise name already exists' });
+      res.status(400).json(createErrorResponse(ErrorCode.DUPLICATE_RESOURCE));
       return;
     }
 
@@ -51,11 +52,11 @@ export const createEnterprise = async (req: AuthRequest, res: Response): Promise
   } catch (error: any) {
     if (error.code === 11000) {
       logger.warn('Create enterprise failed - duplicate key error', { name: req.body.name });
-      res.status(400).json({ error: 'Enterprise name already exists' });
+      res.status(400).json(createErrorResponse(ErrorCode.DUPLICATE_RESOURCE));
       return;
     }
     logger.error('Create enterprise failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
-    res.status(500).json({ error: 'Failed to create enterprise' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -71,7 +72,7 @@ export const getEnterprise = async (req: AuthRequest, res: Response): Promise<vo
     
     if (!enterprise) {
       logger.warn('Get enterprise failed - enterprise not found', { enterpriseId: id, userId: req.user?.userId });
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -82,14 +83,14 @@ export const getEnterprise = async (req: AuthRequest, res: Response): Promise<vo
 
     if (!isMember && !isOwner && enterprise.subscription.plan === 'free') {
       logger.warn('Get enterprise failed - access denied', { enterpriseId: id, userId: req.user?.userId, plan: enterprise.subscription.plan });
-      res.status(403).json({ error: 'Access denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
       return;
     }
 
     res.json(enterprise);
   } catch (error) {
     logger.error('Get enterprise failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, enterpriseId: req.params.id });
-    res.status(500).json({ error: 'Failed to get enterprise' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -100,13 +101,13 @@ export const getMyEnterprise = async (req: AuthRequest, res: Response): Promise<
       .populate('members.userId', 'username email avatar');
 
     if (!enterprise) {
-      res.status(404).json({ error: 'No enterprise found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
     res.json(enterprise);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get enterprise' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -117,7 +118,7 @@ export const updateEnterprise = async (req: AuthRequest, res: Response): Promise
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -127,7 +128,7 @@ export const updateEnterprise = async (req: AuthRequest, res: Response): Promise
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isAdmin && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
@@ -139,7 +140,7 @@ export const updateEnterprise = async (req: AuthRequest, res: Response): Promise
     await enterprise.save();
     res.json(enterprise);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update enterprise' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -150,7 +151,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -160,13 +161,13 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isAdmin && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
     const existingMember = await User.findOne({ email, enterpriseId: id });
     if (existingMember) {
-      res.status(400).json({ error: 'User is already a member of this enterprise' });
+      res.status(400).json(createErrorResponse(ErrorCode.USER_ALREADY_MEMBER));
       return;
     }
 
@@ -176,7 +177,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
       status: 'pending'
     });
     if (existingInvitation) {
-      res.status(400).json({ error: 'A pending invitation already exists for this email' });
+      res.status(400).json(createErrorResponse(ErrorCode.INVITATION_PENDING_EXISTS));
       return;
     }
 
@@ -205,7 +206,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
     res.status(201).json(invitation);
   } catch (error) {
     logger.error('Failed to invite member', { error: error instanceof Error ? error.message : String(error) });
-    res.status(500).json({ error: 'Failed to invite member' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -215,7 +216,7 @@ export const getInvitations = async (req: AuthRequest, res: Response): Promise<v
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -225,7 +226,7 @@ export const getInvitations = async (req: AuthRequest, res: Response): Promise<v
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isAdmin && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
@@ -236,7 +237,7 @@ export const getInvitations = async (req: AuthRequest, res: Response): Promise<v
     res.json(invitations);
   } catch (error) {
     logger.error('Failed to get invitations', { error: error instanceof Error ? error.message : String(error) });
-    res.status(500).json({ error: 'Failed to get invitations' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -246,36 +247,36 @@ export const acceptInvitation = async (req: AuthRequest, res: Response): Promise
 
     const invitation = await Invitation.findOne({ token });
     if (!invitation) {
-      res.status(404).json({ error: 'Invitation not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.INVITATION_NOT_FOUND));
       return;
     }
 
     if (invitation.status !== 'pending') {
-      res.status(400).json({ error: 'Invitation has already been processed' });
+      res.status(400).json(createErrorResponse(ErrorCode.INVITATION_ALREADY_PROCESSED));
       return;
     }
 
     if (invitation.expiresAt < new Date()) {
       invitation.status = 'expired';
       await invitation.save();
-      res.status(400).json({ error: 'Invitation has expired' });
+      res.status(400).json(createErrorResponse(ErrorCode.INVITATION_EXPIRED));
       return;
     }
 
     const user = await User.findById(req.user?.userId);
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.USER_NOT_FOUND));
       return;
     }
 
     if (user.email !== invitation.email) {
-      res.status(400).json({ error: 'Invitation email does not match user email' });
+      res.status(400).json(createErrorResponse(ErrorCode.INVITATION_EMAIL_MISMATCH));
       return;
     }
 
     const enterprise = await Enterprise.findById(invitation.enterpriseId);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -305,7 +306,7 @@ export const acceptInvitation = async (req: AuthRequest, res: Response): Promise
     res.json({ message: 'Invitation accepted successfully', enterprise });
   } catch (error) {
     logger.error('Failed to accept invitation', { error: error instanceof Error ? error.message : String(error) });
-    res.status(500).json({ error: 'Failed to accept invitation' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -315,23 +316,23 @@ export const declineInvitation = async (req: AuthRequest, res: Response): Promis
 
     const invitation = await Invitation.findOne({ token });
     if (!invitation) {
-      res.status(404).json({ error: 'Invitation not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.INVITATION_NOT_FOUND));
       return;
     }
 
     if (invitation.status !== 'pending') {
-      res.status(400).json({ error: 'Invitation has already been processed' });
+      res.status(400).json(createErrorResponse(ErrorCode.INVITATION_ALREADY_PROCESSED));
       return;
     }
 
     const user = await User.findById(req.user?.userId);
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.USER_NOT_FOUND));
       return;
     }
 
     if (user.email !== invitation.email) {
-      res.status(400).json({ error: 'Invitation email does not match user email' });
+      res.status(400).json(createErrorResponse(ErrorCode.INVITATION_EMAIL_MISMATCH));
       return;
     }
 
@@ -351,7 +352,7 @@ export const declineInvitation = async (req: AuthRequest, res: Response): Promis
     res.json({ message: 'Invitation declined successfully' });
   } catch (error) {
     logger.error('Failed to decline invitation', { error: error instanceof Error ? error.message : String(error) });
-    res.status(500).json({ error: 'Failed to decline invitation' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -361,7 +362,7 @@ export const cancelInvitation = async (req: AuthRequest, res: Response): Promise
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -371,18 +372,18 @@ export const cancelInvitation = async (req: AuthRequest, res: Response): Promise
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isAdmin && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
     const invitation = await Invitation.findById(invitationId);
     if (!invitation) {
-      res.status(404).json({ error: 'Invitation not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.INVITATION_NOT_FOUND));
       return;
     }
 
     if (invitation.enterpriseId.toString() !== id) {
-      res.status(400).json({ error: 'Invitation does not belong to this enterprise' });
+      res.status(400).json(createErrorResponse(ErrorCode.OPERATION_NOT_ALLOWED));
       return;
     }
 
@@ -401,7 +402,7 @@ export const cancelInvitation = async (req: AuthRequest, res: Response): Promise
     res.json({ message: 'Invitation cancelled successfully' });
   } catch (error) {
     logger.error('Failed to cancel invitation', { error: error instanceof Error ? error.message : String(error) });
-    res.status(500).json({ error: 'Failed to cancel invitation' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -411,7 +412,7 @@ export const removeMember = async (req: AuthRequest, res: Response): Promise<voi
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -421,7 +422,7 @@ export const removeMember = async (req: AuthRequest, res: Response): Promise<voi
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isAdmin && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
@@ -432,7 +433,7 @@ export const removeMember = async (req: AuthRequest, res: Response): Promise<voi
 
     res.json({ message: 'Member removed' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to remove member' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -443,13 +444,13 @@ export const updateMemberRole = async (req: AuthRequest, res: Response): Promise
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
     const isOwner = enterprise.owner.toString() === req.user?.userId;
     if (!isOwner) {
-      res.status(403).json({ error: 'Only owner can change roles' });
+      res.status(403).json(createErrorResponse(ErrorCode.FORBIDDEN));
       return;
     }
 
@@ -457,7 +458,7 @@ export const updateMemberRole = async (req: AuthRequest, res: Response): Promise
       m => m.userId.toString() === memberId
     );
     if (!member) {
-      res.status(404).json({ error: 'Member not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.USER_NOT_FOUND));
       return;
     }
 
@@ -466,7 +467,7 @@ export const updateMemberRole = async (req: AuthRequest, res: Response): Promise
 
     res.json({ message: 'Role updated' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update role' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -474,24 +475,24 @@ export const leaveEnterprise = async (req: AuthRequest, res: Response): Promise<
   try {
     const userId = req.user?.userId;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json(createErrorResponse(ErrorCode.UNAUTHORIZED));
       return;
     }
 
     const user = await User.findById(userId);
     if (!user || !user.enterpriseId) {
-      res.status(400).json({ error: 'User is not a member of any enterprise' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
     const enterprise = await Enterprise.findById(user.enterpriseId);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
     if (enterprise.owner.toString() === userId) {
-      res.status(400).json({ error: 'Owner cannot leave enterprise. Transfer ownership first.' });
+      res.status(400).json(createErrorResponse(ErrorCode.OPERATION_NOT_ALLOWED));
       return;
     }
 
@@ -506,7 +507,7 @@ export const leaveEnterprise = async (req: AuthRequest, res: Response): Promise<
 
     res.json({ message: 'Successfully left enterprise' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to leave enterprise' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -517,7 +518,7 @@ export const updateAuthSettings = async (req: AuthRequest, res: Response): Promi
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -527,7 +528,7 @@ export const updateAuthSettings = async (req: AuthRequest, res: Response): Promi
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isAdmin && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
@@ -544,7 +545,7 @@ export const updateAuthSettings = async (req: AuthRequest, res: Response): Promi
       settings: enterprise.settings.auth 
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update auth settings' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -554,7 +555,7 @@ export const getAuthSettings = async (req: AuthRequest, res: Response): Promise<
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -564,13 +565,13 @@ export const getAuthSettings = async (req: AuthRequest, res: Response): Promise<
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isMember && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
     res.json(enterprise.settings.auth);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get auth settings' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -580,7 +581,7 @@ export const getAuthSettingsPublic = async (req: Request, res: Response): Promis
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -589,7 +590,7 @@ export const getAuthSettingsPublic = async (req: Request, res: Response): Promis
       oauthRequired: enterprise.settings.auth.oauthRequired
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get auth settings' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -599,7 +600,7 @@ export const getResourceReviewSettings = async (req: AuthRequest, res: Response)
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -609,13 +610,13 @@ export const getResourceReviewSettings = async (req: AuthRequest, res: Response)
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isMember && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
     res.json(enterprise.settings.resourceReview);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get resource review settings' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -626,7 +627,7 @@ export const updateResourceReviewSettings = async (req: AuthRequest, res: Respon
 
     const enterprise = await Enterprise.findById(id);
     if (!enterprise) {
-      res.status(404).json({ error: 'Enterprise not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
@@ -636,7 +637,7 @@ export const updateResourceReviewSettings = async (req: AuthRequest, res: Respon
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isAdmin && !isOwner) {
-      res.status(403).json({ error: 'Not authorized' });
+      res.status(403).json(createErrorResponse(ErrorCode.NOT_AUTHORIZED));
       return;
     }
 
@@ -653,6 +654,6 @@ export const updateResourceReviewSettings = async (req: AuthRequest, res: Respon
       settings: enterprise.settings.resourceReview 
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update resource review settings' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };

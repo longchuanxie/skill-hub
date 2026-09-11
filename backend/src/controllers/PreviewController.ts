@@ -7,6 +7,10 @@ import fs from 'fs';
 import unzipper from 'unzipper';
 import { cache } from '../utils/cache';
 import crypto from 'crypto';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('PreviewController');
 
 interface FileTreeNode {
   name: string;
@@ -24,7 +28,7 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({ error: 'Skill not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.SKILL_NOT_FOUND));
       return;
     }
 
@@ -33,19 +37,19 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
       String(skill.owner) === req.user?.userId;
 
     if (!hasAccess) {
-      res.status(403).json({ error: 'Access denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
       return;
     }
 
     const latestVersion = await SkillVersion.findOne({ skillId: skill._id }).sort({ createdAt: -1 });
     if (!latestVersion || !latestVersion.url) {
-      res.status(400).json({ error: 'No file available' });
+      res.status(400).json(createErrorResponse(ErrorCode.NO_FILE_AVAILABLE));
       return;
     }
 
     const zipPath = path.join(process.cwd(), latestVersion.url);
     if (!fs.existsSync(zipPath)) {
-      res.status(400).json({ error: 'File not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.FILE_NOT_FOUND));
       return;
     }
 
@@ -75,8 +79,8 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
       // Don't clean up extracted dir because it's in cache
     }
   } catch (error) {
-    console.error('Get skill file tree error:', error);
-    res.status(500).json({ error: 'Failed to get file tree' });
+    logger.error('Get skill file tree error:', error);
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 
@@ -86,13 +90,13 @@ export const previewSkillFile = async (req: AuthRequest, res: Response): Promise
     const filePath = req.query.path as string || '';
 
     if (!skillId) {
-      res.status(400).json({ error: 'Skill ID is required' });
+      res.status(400).json(createErrorResponse(ErrorCode.MISSING_REQUIRED_FIELD));
       return;
     }
 
     const skill = await Skill.findById(skillId);
     if (!skill) {
-      res.status(404).json({ error: 'Skill not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.SKILL_NOT_FOUND));
       return;
     }
 
@@ -101,19 +105,19 @@ export const previewSkillFile = async (req: AuthRequest, res: Response): Promise
       String(skill.owner) === req.user?.userId;
 
     if (!hasAccess) {
-      res.status(403).json({ error: 'Access denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
       return;
     }
 
     const latestVersion = await SkillVersion.findOne({ skillId: skill._id }).sort({ createdAt: -1 });
     if (!latestVersion || !latestVersion.url) {
-      res.status(400).json({ error: 'No file available' });
+      res.status(400).json(createErrorResponse(ErrorCode.NO_FILE_AVAILABLE));
       return;
     }
 
     const zipPath = path.join(process.cwd(), latestVersion.url);
     if (!fs.existsSync(zipPath)) {
-      res.status(400).json({ error: 'File not found' });
+      res.status(404).json(createErrorResponse(ErrorCode.FILE_NOT_FOUND));
       return;
     }
 
@@ -123,7 +127,7 @@ export const previewSkillFile = async (req: AuthRequest, res: Response): Promise
     try {
       const fullPath = resolveWithinDir(extractedDir, filePath);
       if (!fullPath || !fs.existsSync(fullPath)) {
-        res.status(404).json({ error: 'File not found' });
+        res.status(404).json(createErrorResponse(ErrorCode.FILE_NOT_FOUND));
         return;
       }
 
@@ -154,8 +158,8 @@ export const previewSkillFile = async (req: AuthRequest, res: Response): Promise
       // Don't clean up extracted dir because it's in cache
     }
   } catch (error) {
-    console.error('Preview skill file error:', error);
-    res.status(500).json({ error: 'Failed to preview file' });
+    logger.error('Preview skill file error:', error);
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
 

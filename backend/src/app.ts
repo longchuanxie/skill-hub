@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './config/env';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -8,7 +9,7 @@ import path from 'path';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { enterpriseMiddleware } from './middleware/enterpriseMiddleware';
-import { initializeEnterpriseContext } from './config/enterpriseContext';
+import { initializeEnterpriseContext, enterpriseContext } from './config/enterpriseContext';
 import { getLocalPath, getBaseUrl } from './config/storage';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
@@ -35,10 +36,9 @@ import searchRoutes from './routes/search';
 import recommendationRoutes from './routes/recommendations';
 import adminRoutes from './routes/admin';
 import invitationRoutes from './routes/invitation';
-import { initializeSuperAdmin } from './utils/initSuperAdmin';
+import { ErrorCode, createErrorResponse } from './utils/errors';
 
 const app: Application = express();
-const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
 app.use(cors({
@@ -74,10 +74,17 @@ initializeEnterpriseContext();
 
 app.use(enterpriseMiddleware);
 
-app.get('/api/health', (req: Request, res: Response) => {
-  const { enterpriseContext } = require('./config/enterpriseContext');
-  res.json({ 
-    status: 'ok', 
+app.get('/api/health', async (req: Request, res: Response) => {
+  let dbOk = false;
+  try {
+    await mongoose.connection.db?.command({ ping: 1 });
+    dbOk = true;
+  } catch {
+    dbOk = false;
+  }
+
+  res.status(dbOk ? 200 : 503).json({
+    status: dbOk ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     enterprise: enterpriseContext.isSingleTenantMode() ? {
       mode: 'single-tenant',
@@ -104,7 +111,9 @@ app.use('/api/likes', likeRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/trends', trendsRoutes);
-app.use('/api/test', testRoutes);
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api/test', testRoutes);
+}
 app.use('/api/custom-pages', customPagesRoutes);
 app.use('/api/versions', versionsRoutes);
 app.use('/api', permissionsRoutes);
@@ -123,48 +132,9 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: 'Not Found' });
+  res.status(404).json(createErrorResponse(ErrorCode.RESOURCE_NOT_FOUND));
 });
 
 app.use(errorHandler);
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/skillhub';
-
-logger.info('Starting server...', { 
-  port: PORT, 
-  nodeEnv: process.env.NODE_ENV, 
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173' 
-});
-
-mongoose.connect(MONGODB_URI)
-  .then(async () => {
-    logger.info('Connected to MongoDB', { uri: MONGODB_URI.replace(/\/\/.*@/, '//****@') });
-    
-    // 初始化超级管理员
-    try {
-      await initializeSuperAdmin();
-    } catch (error) {
-      logger.error('Failed to initialize super admin', { 
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-    }
-    
-    app.listen(PORT, () => {
-      logger.info(`Server is running on port ${PORT}`, { 
-        port: PORT, 
-        environment: process.env.NODE_ENV || 'development',
-        timestamp: new Date().toISOString()
-      });
-    });
-  })
-  .catch((error) => {
-    logger.error('MongoDB connection error', { 
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      uri: MONGODB_URI.replace(/\/\/.*@/, '//****@')
-    });
-    process.exit(1);
-  });
 
 export default app;

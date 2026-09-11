@@ -1,14 +1,11 @@
 import request from 'supertest';
 import app from '../app';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { User } from '../models/User';
 import { Enterprise } from '../models/Enterprise';
 import { Invitation } from '../models/Invitation';
 import jwt from 'jsonwebtoken';
 
 describe('Invitation Controller', () => {
-  let mongoServer: MongoMemoryServer;
   let adminUser: any;
   let enterpriseAdminUser: any;
   let regularUser: any;
@@ -16,16 +13,6 @@ describe('Invitation Controller', () => {
   let adminToken: string;
   let enterpriseAdminToken: string;
   let regularToken: string;
-
-  beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri());
-  });
-
-  afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
-  });
 
   beforeEach(async () => {
     await User.deleteMany({});
@@ -116,7 +103,7 @@ describe('Invitation Controller', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('already a member');
+      expect(response.body.code).toBe('USER_ALREADY_MEMBER');
     });
 
     it('should return 400 if pending invitation exists', async () => {
@@ -138,7 +125,7 @@ describe('Invitation Controller', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('pending invitation');
+      expect(response.body.code).toBe('INVITATION_PENDING_EXISTS');
     });
   });
 
@@ -234,7 +221,7 @@ describe('Invitation Controller', () => {
         .set('Authorization', `Bearer ${regularToken}`);
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('expired');
+      expect(response.body.code).toBe('INVITATION_EXPIRED');
     });
 
     it('should return 400 if email does not match', async () => {
@@ -252,7 +239,7 @@ describe('Invitation Controller', () => {
         .set('Authorization', `Bearer ${regularToken}`);
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('email does not match');
+      expect(response.body.code).toBe('INVITATION_EMAIL_MISMATCH');
     });
   });
 

@@ -4,6 +4,9 @@ import { validateSkillUpload, SkillManifest } from './skillUploadValidator';
 import { contentReviewConfig } from '../config/contentReviewConfig';
 import { reviewPluginManager } from './reviewPluginManager';
 import { ReviewContext } from '../types/reviewPlugin';
+import { createLogger } from './logger';
+
+const logger = createLogger('resourceAutoReview');
 
 export interface AutoReviewResult {
   passed: boolean;
@@ -244,7 +247,7 @@ export async function reviewSkill(skillData: any, filePath?: string): Promise<Au
         warnings: result.warnings,
       };
     } catch (error) {
-      console.error('Custom review plugin failed:', error);
+      logger.error('Custom review plugin failed:', error);
       if (contentReviewConfig.strictMode) {
         return {
           passed: false,
@@ -360,7 +363,7 @@ export async function reviewPrompt(promptData: any): Promise<AutoReviewResult> {
         warnings: result.warnings,
       };
     } catch (error) {
-      console.error('Custom review plugin failed:', error);
+      logger.error('Custom review plugin failed:', error);
       if (contentReviewConfig.strictMode) {
         return {
           passed: false,

@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { Comment } from '../models/Comment';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('commentController');
 
 export const commentController = {
   // 获取资源的评论列表（支持嵌套回复）
@@ -22,7 +25,7 @@ export const commentController = {
 
       res.json(comments);
     } catch (error) {
-      console.error('Get comments error:', error);
+      logger.error('Get comments error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -55,7 +58,7 @@ export const commentController = {
 
       res.status(201).json(populatedComment);
     } catch (error) {
-      console.error('Create comment error:', error);
+      logger.error('Create comment error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -81,7 +84,7 @@ export const commentController = {
       await comment.deleteOne();
       res.json({ message: 'Comment deleted successfully' });
     } catch (error) {
-      console.error('Delete comment error:', error);
+      logger.error('Delete comment error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   }

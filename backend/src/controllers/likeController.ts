@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('likeController');
 
 export const likeController = {
   toggleLike: async (req: Request, res: Response): Promise<void> => {
@@ -62,7 +65,7 @@ export const likeController = {
         res.status(400).json({ message: 'Invalid type' });
       }
     } catch (error) {
-      console.error('Toggle like error:', error);
+      logger.error('Toggle like error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -94,7 +97,7 @@ export const likeController = {
         res.status(400).json({ message: 'Invalid type' });
       }
     } catch (error) {
-      console.error('Check like error:', error);
+      logger.error('Check like error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -124,7 +127,7 @@ export const likeController = {
         res.status(400).json({ message: 'Invalid type' });
       }
     } catch (error) {
-      console.error('Get likes error:', error);
+      logger.error('Get likes error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   }

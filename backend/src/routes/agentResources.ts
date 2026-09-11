@@ -12,6 +12,10 @@ import {
   incrementVersion,
   createResourceVersion,
 } from '../utils/resourceHelpers';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('agentResources');
 
 const router = Router();
 
@@ -20,7 +24,7 @@ router.use(authenticateAgent);
 router.get('/skills', async (req: AgentRequest, res: Response) => {
   try {
     if (!req.agent.permissions.canRead) {
-      res.status(403).json({ error: 'Read permission denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.READ_PERMISSION_DENIED));
       return;
     }
 
@@ -48,14 +52,14 @@ router.get('/skills', async (req: AgentRequest, res: Response) => {
       pagination: { page: Number(page), pageSize: Number(pageSize), total, pages: Math.ceil(total / Number(pageSize)) }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get skills' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 });
 
 router.get('/prompts', async (req: AgentRequest, res: Response) => {
   try {
     if (!req.agent.permissions.canRead) {
-      res.status(403).json({ error: 'Read permission denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.READ_PERMISSION_DENIED));
       return;
     }
 
@@ -83,14 +87,14 @@ router.get('/prompts', async (req: AgentRequest, res: Response) => {
       pagination: { page: Number(page), pageSize: Number(pageSize), total, pages: Math.ceil(total / Number(pageSize)) }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get prompts' });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 });
 
 router.get('/skills/:id/download', async (req: AgentRequest, res: Response) => {
   try {
     if (!req.agent.permissions.canRead) {
-      res.status(403).json({ error: 'Read permission denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.READ_PERMISSION_DENIED));
       return;
     }
 
@@ -121,7 +125,7 @@ router.get('/skills/:id/download', async (req: AgentRequest, res: Response) => {
 
     res.download(latestVersion.url, `${skill.name}.zip`);
   } catch (error) {
-    console.error('Download error:', error);
+    logger.error('Download error:', error);
     res.status(500).json({ error: 'DOWNLOAD_FAILED', message: 'Failed to download skill' });
   }
 });
@@ -129,7 +133,7 @@ router.get('/skills/:id/download', async (req: AgentRequest, res: Response) => {
 router.post('/skills', skillFileUpload, async (req: AgentRequest, res: Response) => {
   try {
     if (!req.agent.permissions.canWrite) {
-      res.status(403).json({ error: 'Write permission denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.WRITE_PERMISSION_DENIED));
       return;
     }
 
@@ -157,7 +161,7 @@ router.post('/skills', skillFileUpload, async (req: AgentRequest, res: Response)
 
     await handleSkillCreate(req, res, hasFile, isEnterpriseAgent);
   } catch (error) {
-    console.error('Create skill error:', error);
+    logger.error('Create skill error:', error);
     res.status(500).json({
       error: 'SERVER_ERROR',
       message: 'Failed to create skill'
@@ -301,7 +305,7 @@ async function handleSkillUpdate(req: AgentRequest, res: Response, existingSkill
 router.post('/prompts', async (req: AgentRequest, res: Response) => {
   try {
     if (!req.agent.permissions.canWrite) {
-      res.status(403).json({ error: 'Write permission denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.WRITE_PERMISSION_DENIED));
       return;
     }
 
@@ -320,7 +324,7 @@ router.post('/prompts', async (req: AgentRequest, res: Response) => {
 
     await handlePromptCreate(req, res, isEnterpriseAgent);
   } catch (error) {
-    console.error('Create prompt error:', error);
+    logger.error('Create prompt error:', error);
     res.status(500).json({
       error: 'SERVER_ERROR',
       message: 'Failed to create prompt'
@@ -442,25 +446,25 @@ async function handlePromptUpdate(req: AgentRequest, res: Response, existingProm
 router.get('/check-update', async (req: AgentRequest, res: Response) => {
   try {
     if (!req.agent.permissions.canRead) {
-      res.status(403).json({ error: 'Read permission denied' });
+      res.status(403).json(createErrorResponse(ErrorCode.READ_PERMISSION_DENIED));
       return;
     }
 
     const { resourceType, name, version } = req.query;
 
     if (!resourceType || !name || !version) {
-      res.status(400).json({
-        error: 'MISSING_PARAMETERS',
-        message: 'resourceType, name and version are required'
-      });
+      res.status(400).json(createErrorResponse(
+        ErrorCode.MISSING_REQUIRED_FIELD,
+        'resourceType, name and version are required'
+      ));
       return;
     }
 
     if (resourceType !== 'skill' && resourceType !== 'prompt') {
-      res.status(400).json({
-        error: 'INVALID_RESOURCE_TYPE',
-        message: 'resourceType must be "skill" or "prompt"'
-      });
+      res.status(400).json(createErrorResponse(
+        ErrorCode.INVALID_INPUT,
+        'resourceType must be "skill" or "prompt"'
+      ));
       return;
     }
 
@@ -480,10 +484,10 @@ router.get('/check-update', async (req: AgentRequest, res: Response) => {
       : await (Prompt as any).findOne(filter);
 
     if (!resource) {
-      res.status(404).json({
-        error: 'RESOURCE_NOT_FOUND',
-        message: `No ${resourceType} found with the given name`
-      });
+      res.status(404).json(createErrorResponse(
+        ErrorCode.RESOURCE_NOT_FOUND,
+        `No ${resourceType} found with the given name`
+      ));
       return;
     }
 
@@ -508,7 +512,7 @@ router.get('/check-update', async (req: AgentRequest, res: Response) => {
       changelog: latestResourceVersion?.changelog || latestVersionDoc?.updateDescription || null,
     });
   } catch (error) {
-    console.error('Check update error:', error);
+    logger.error('Check update error:', error);
     res.status(500).json({
       error: 'SERVER_ERROR',
       message: 'Failed to check for updates'

@@ -538,7 +538,7 @@ describe('Agent Resources Version Management', () => {
         .set('X-API-Key', agentApiKey)
         .expect(400);
 
-      expect(response.body.error).toBe('MISSING_PARAMETERS');
+      expect(response.body.code).toBe('MISSING_REQUIRED_FIELD');
     });
 
     it('should return 400 for invalid resource type', async () => {
@@ -548,7 +548,7 @@ describe('Agent Resources Version Management', () => {
         .set('X-API-Key', agentApiKey)
         .expect(400);
 
-      expect(response.body.error).toBe('INVALID_RESOURCE_TYPE');
+      expect(response.body.code).toBe('INVALID_INPUT');
     });
 
     it('should return 404 for non-existent resource', async () => {
@@ -558,7 +558,7 @@ describe('Agent Resources Version Management', () => {
         .set('X-API-Key', agentApiKey)
         .expect(404);
 
-      expect(response.body.error).toBe('RESOURCE_NOT_FOUND');
+      expect(response.body.code).toBe('RESOURCE_NOT_FOUND');
     });
   });
 });

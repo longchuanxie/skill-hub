@@ -20,6 +20,9 @@ import {
 } from '../validations/passwordValidation';
 import { publicApiLimiter } from '../middleware/rateLimit';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('auth');
 
 const router = Router();
 
@@ -53,7 +56,7 @@ router.post('/send-verification-email', authenticate, async (req: AuthRequest, r
     user.emailVerificationToken = token;
     await user.save();
 
-    console.log(`Email verification token for ${user.email}: ${token}`);
+    logger.info(`Email verification token for ${user.email}: ${token}`);
     res.json({ message: 'Verification email sent', expiresIn: 3600 });
   } catch (error) {
     const err = createErrorResponse(ErrorCode.EMAIL_SEND_FAILED);

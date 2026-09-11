@@ -21,4 +21,7 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   testTimeout: 10000,
+  // The app leaves benign open handles (winston transports, caches) after the
+  // run completes; force exit instead of hanging CI.
+  forceExit: true,
 };

@@ -5,6 +5,9 @@ import { OAuthSession } from '../models/OAuthSession';
 import { User } from '../models/User';
 import { generateAccessToken } from '../utils/jwt';
 import axios from 'axios';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('oauthController');
 
 const getProviderConfig = (provider: string): { authorizationURL: string; tokenURL: string; userInfoURL: string; scope: string } | undefined => {
   const configs: Record<string, { authorizationURL: string; tokenURL: string; userInfoURL: string; scope: string }> = {
@@ -111,7 +114,7 @@ export const getAuthUrl = async (req: Request, res: Response): Promise<void> => 
       }
     });
   } catch (error) {
-    console.error('获取授权URL时出错:', error);
+    logger.error('获取授权URL时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to generate auth URL'
@@ -255,7 +258,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
 
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/oauth/callback?token=${token}`);
   } catch (error) {
-    console.error('OAuth回调处理时出错:', error);
+    logger.error('OAuth回调处理时出错:', error);
     res.status(500).json({
       success: false,
       error: 'OAuth callback failed'
@@ -280,7 +283,7 @@ export const getProviders = async (req: Request, res: Response): Promise<void> =
       data: providers
     });
   } catch (error) {
-    console.error('获取OAuth提供商列表时出错:', error);
+    logger.error('获取OAuth提供商列表时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch providers'
@@ -356,7 +359,7 @@ export const linkAccount = async (req: AuthRequest, res: Response): Promise<void
       data: { authUrl: authUrl.toString() }
     });
   } catch (error) {
-    console.error('链接账户时出错:', error);
+    logger.error('链接账户时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to link account'
@@ -403,7 +406,7 @@ export const createProvider = async (req: AuthRequest, res: Response): Promise<v
       data: oauthProvider
     });
   } catch (error) {
-    console.error('创建OAuth提供商时出错:', error);
+    logger.error('创建OAuth提供商时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create OAuth provider'
@@ -438,7 +441,7 @@ export const updateProvider = async (req: AuthRequest, res: Response): Promise<v
       data: oauthProvider
     });
   } catch (error) {
-    console.error('更新OAuth提供商时出错:', error);
+    logger.error('更新OAuth提供商时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update OAuth provider'
@@ -465,7 +468,7 @@ export const deleteProvider = async (req: AuthRequest, res: Response): Promise<v
       message: 'OAuth provider deleted'
     });
   } catch (error) {
-    console.error('删除OAuth提供商时出错:', error);
+    logger.error('删除OAuth提供商时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete OAuth provider'
@@ -486,7 +489,7 @@ export const getEnterpriseProviders = async (req: AuthRequest, res: Response): P
       data: providers
     });
   } catch (error) {
-    console.error('获取企业OAuth提供商列表时出错:', error);
+    logger.error('获取企业OAuth提供商列表时出错:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch enterprise providers'
