@@ -100,6 +100,20 @@ npm run build
 npm start
 ```
 
+## 数据库迁移（migrate-mongo）
+
+针对数据回填、破坏性 schema 变更、必须只执行一次的索引重建使用迁移；
+普通 schema 变更仍由 Mongoose 隐式同步。
+
+```bash
+npm run migrate:status   # 查看迁移状态
+npm run migrate:create   # 创建新迁移文件（migrations/ 目录）
+npm run migrate:up       # 执行待运行的迁移
+npm run migrate:down     # 回滚最近一次迁移
+```
+
+连接串取自 `MONGODB_URI`（见 `migrate-mongo-config.js`）。
+
 ## API 接口
 
 ### 认证接口

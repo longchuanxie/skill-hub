@@ -6,6 +6,7 @@ import { Prompt } from '../models/Prompt';
 import { AuthRequest } from '../middleware/auth';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { escapeRegex } from '../utils/escapeRegex';
 import { AuditLog } from '../models/AuditLog';
 
 const logger = createLogger('AdminController');
@@ -14,15 +15,16 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
   try {
     logger.info('Getting dashboard stats', { adminId: req.user?.userId });
 
-    const [totalUsers, totalEnterprises, totalSkills, totalPrompts, pendingSkills, pendingPrompts] = await Promise.all([
-      User.countDocuments(),
-      Enterprise.countDocuments(),
-      Skill.countDocuments(),
-      Prompt.countDocuments(),
-      Skill.countDocuments({ status: 'pending' }),
-      Prompt.countDocuments({ status: 'pending' }),
-    ]);
-    
+    const [totalUsers, totalEnterprises, totalSkills, totalPrompts, pendingSkills, pendingPrompts] =
+      await Promise.all([
+        User.countDocuments(),
+        Enterprise.countDocuments(),
+        Skill.countDocuments(),
+        Prompt.countDocuments(),
+        Skill.countDocuments({ status: 'pending' }),
+        Prompt.countDocuments({ status: 'pending' }),
+      ]);
+
     const pendingContent = pendingSkills + pendingPrompts;
 
     const recentUsers = await User.find()
@@ -30,8 +32,12 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
       .limit(10)
       .select('username email avatar role createdAt');
 
-    logger.info('Dashboard stats retrieved successfully', { 
-      totalUsers, totalEnterprises, totalSkills, totalPrompts, pendingContent 
+    logger.info('Dashboard stats retrieved successfully', {
+      totalUsers,
+      totalEnterprises,
+      totalSkills,
+      totalPrompts,
+      pendingContent,
     });
 
     res.json({
@@ -43,9 +49,9 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
       recentUsers,
     });
   } catch (error) {
-    logger.error('Get dashboard stats failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined 
+    logger.error('Get dashboard stats failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -57,15 +63,21 @@ export const getUserList = async (req: AuthRequest, res: Response): Promise<void
     const { page = 1, pageSize = 20, search, role, status } = req.query;
     const skip = (Number(page) - 1) * Number(pageSize);
 
-    logger.debug('Getting user list', { 
-      adminId: req.user?.userId, page, pageSize, search, role, status 
+    logger.debug('Getting user list', {
+      adminId: req.user?.userId,
+      page,
+      pageSize,
+      search,
+      role,
+      status,
     });
 
     const filter: any = {};
     if (search) {
+      const escapedSearch = escapeRegex(String(search));
       filter.$or = [
-        { username: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { username: { $regex: escapedSearch, $options: 'i' } },
+        { email: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
     if (role) filter.role = role;
@@ -78,7 +90,7 @@ export const getUserList = async (req: AuthRequest, res: Response): Promise<void
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(pageSize)),
-      User.countDocuments(filter)
+      User.countDocuments(filter),
     ]);
 
     logger.info('User list retrieved successfully', { count: users.length, total });
@@ -89,13 +101,13 @@ export const getUserList = async (req: AuthRequest, res: Response): Promise<void
         page: Number(page),
         pageSize: Number(pageSize),
         total,
-        pages: Math.ceil(total / Number(pageSize))
-      }
+        pages: Math.ceil(total / Number(pageSize)),
+      },
     });
   } catch (error) {
-    logger.error('Get user list failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined 
+    logger.error('Get user list failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -105,13 +117,11 @@ export const getUserList = async (req: AuthRequest, res: Response): Promise<void
 export const getUserById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     logger.debug('Getting user by ID', { adminId: req.user?.userId, userId: id });
-    
-    const user = await User.findById(id)
-      .select('-password')
-      .populate('enterpriseId', 'name');
-    
+
+    const user = await User.findById(id).select('-password').populate('enterpriseId', 'name');
+
     if (!user) {
       logger.warn('Get user failed - user not found', { adminId: req.user?.userId, userId: id });
       const error = createErrorResponse(ErrorCode.USER_NOT_FOUND);
@@ -121,10 +131,10 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 
     res.json(user);
   } catch (error) {
-    logger.error('Get user failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined, 
-      userId: req.params.id 
+    logger.error('Get user failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.params.id,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -136,13 +146,18 @@ export const updateUserRole = async (req: AuthRequest, res: Response): Promise<v
     const { id } = req.params;
     const { role } = req.body;
 
-    logger.info('Updating user role', { 
-      adminId: req.user?.userId, userId: id, newRole: role 
+    logger.info('Updating user role', {
+      adminId: req.user?.userId,
+      userId: id,
+      newRole: role,
     });
 
     const user = await User.findById(id);
     if (!user) {
-      logger.warn('Update user role failed - user not found', { adminId: req.user?.userId, userId: id });
+      logger.warn('Update user role failed - user not found', {
+        adminId: req.user?.userId,
+        userId: id,
+      });
       const error = createErrorResponse(ErrorCode.USER_NOT_FOUND);
       res.status(error.statusCode).json(error);
       return;
@@ -166,10 +181,10 @@ export const updateUserRole = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({ message: 'Role updated', user: { id: user._id, role: user.role } });
   } catch (error) {
-    logger.error('Update user role failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined, 
-      userId: req.params.id 
+    logger.error('Update user role failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.params.id,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -181,13 +196,18 @@ export const updateUserStatus = async (req: AuthRequest, res: Response): Promise
     const { id } = req.params;
     const { status } = req.body;
 
-    logger.info('Updating user status', { 
-      adminId: req.user?.userId, userId: id, newStatus: status 
+    logger.info('Updating user status', {
+      adminId: req.user?.userId,
+      userId: id,
+      newStatus: status,
     });
 
     const user = await User.findById(id);
     if (!user) {
-      logger.warn('Update user status failed - user not found', { adminId: req.user?.userId, userId: id });
+      logger.warn('Update user status failed - user not found', {
+        adminId: req.user?.userId,
+        userId: id,
+      });
       const error = createErrorResponse(ErrorCode.USER_NOT_FOUND);
       res.status(error.statusCode).json(error);
       return;
@@ -211,10 +231,10 @@ export const updateUserStatus = async (req: AuthRequest, res: Response): Promise
 
     res.json({ message: 'Status updated', user: { id: user._id, status: (user as any).status } });
   } catch (error) {
-    logger.error('Update user status failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined, 
-      userId: req.params.id 
+    logger.error('Update user status failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.params.id,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -226,13 +246,17 @@ export const getEnterpriseList = async (req: AuthRequest, res: Response): Promis
     const { page = 1, pageSize = 20, search, status } = req.query;
     const skip = (Number(page) - 1) * Number(pageSize);
 
-    logger.debug('Getting enterprise list', { 
-      adminId: req.user?.userId, page, pageSize, search, status 
+    logger.debug('Getting enterprise list', {
+      adminId: req.user?.userId,
+      page,
+      pageSize,
+      search,
+      status,
     });
 
     const filter: any = {};
     if (search) {
-      filter.name = { $regex: search, $options: 'i' };
+      filter.name = { $regex: escapeRegex(String(search)), $options: 'i' };
     }
     if (status) filter.status = status;
 
@@ -242,7 +266,7 @@ export const getEnterpriseList = async (req: AuthRequest, res: Response): Promis
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(pageSize)),
-      Enterprise.countDocuments(filter)
+      Enterprise.countDocuments(filter),
     ]);
 
     const enterprisesWithStats = await Promise.all(
@@ -250,14 +274,14 @@ export const getEnterpriseList = async (req: AuthRequest, res: Response): Promis
         const memberCount = enterprise.members.length;
         const skillCount = await Skill.countDocuments({ enterpriseId: enterprise._id });
         const promptCount = await Prompt.countDocuments({ enterpriseId: enterprise._id });
-        
+
         return {
           ...enterprise.toObject(),
           memberCount,
           skillCount,
           promptCount,
         };
-      })
+      }),
     );
 
     logger.info('Enterprise list retrieved successfully', { count: enterprises.length, total });
@@ -268,13 +292,13 @@ export const getEnterpriseList = async (req: AuthRequest, res: Response): Promis
         page: Number(page),
         pageSize: Number(pageSize),
         total,
-        pages: Math.ceil(total / Number(pageSize))
-      }
+        pages: Math.ceil(total / Number(pageSize)),
+      },
     });
   } catch (error) {
-    logger.error('Get enterprise list failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined 
+    logger.error('Get enterprise list failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -284,16 +308,17 @@ export const getEnterpriseList = async (req: AuthRequest, res: Response): Promis
 export const getEnterpriseById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     logger.debug('Getting enterprise by ID', { adminId: req.user?.userId, enterpriseId: id });
-    
+
     const enterprise = await Enterprise.findById(id)
       .populate('owner', 'username email avatar')
       .populate('members.userId', 'username email avatar role');
-    
+
     if (!enterprise) {
-      logger.warn('Get enterprise failed - enterprise not found', { 
-        adminId: req.user?.userId, enterpriseId: id 
+      logger.warn('Get enterprise failed - enterprise not found', {
+        adminId: req.user?.userId,
+        enterpriseId: id,
       });
       const error = createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND);
       res.status(error.statusCode).json(error);
@@ -311,10 +336,10 @@ export const getEnterpriseById = async (req: AuthRequest, res: Response): Promis
       promptCount,
     });
   } catch (error) {
-    logger.error('Get enterprise failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined, 
-      enterpriseId: req.params.id 
+    logger.error('Get enterprise failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      enterpriseId: req.params.id,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);

@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import { getFileUrl } from '../middleware/upload';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
+import { escapeRegex } from '../utils/escapeRegex';
 
 const logger = createLogger('UserController');
 
@@ -150,10 +151,11 @@ export const searchUsers = async (req: AuthRequest, res: Response): Promise<void
     logger.debug('Searching users', { searchQuery, limit, requesterId: req.user?.userId });
 
     const currentUser = await User.findById(req.user?.userId);
+    const escapedQuery = escapeRegex(String(searchQuery));
     const query: any = {
       $or: [
-        { username: { $regex: searchQuery, $options: 'i' } },
-        { email: { $regex: searchQuery, $options: 'i' } },
+        { username: { $regex: escapedQuery, $options: 'i' } },
+        { email: { $regex: escapedQuery, $options: 'i' } },
       ],
     };
 

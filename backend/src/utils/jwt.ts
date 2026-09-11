@@ -1,4 +1,5 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
+import crypto from 'crypto';
 import { IUser } from '../models/User';
 import { logger } from './logger';
 
@@ -7,6 +8,8 @@ export interface TokenPayload {
   role: string;
   enterpriseId?: string;
   type?: TokenType;
+  /** Unique token id: guarantees distinct signatures even within one second. */
+  jti?: string;
 }
 
 export type TokenType = 'access' | 'refresh' | 'email-verification' | 'password-reset';
@@ -43,6 +46,7 @@ export const generateAccessToken = (user: IUser): string => {
     role: user.role,
     enterpriseId: user.enterpriseId?.toString(),
     type: 'access',
+    jti: crypto.randomUUID(),
   };
   const options: SignOptions = {
     expiresIn: '24h',
@@ -55,6 +59,7 @@ export const generateRefreshToken = (user: IUser): string => {
     userId: user._id.toString(),
     role: user.role,
     type: 'refresh',
+    jti: crypto.randomUUID(),
   };
   const options: SignOptions = {
     expiresIn: '7d',

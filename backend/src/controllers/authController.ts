@@ -4,6 +4,7 @@ import { Enterprise } from '../models/Enterprise';
 import { AdminInvitation } from '../models/AdminInvitation';
 import { AuditLog } from '../models/AuditLog';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
+import { revokeToken, isTokenRevoked } from '../utils/tokenBlacklist';
 import { AuthRequest } from '../middleware/auth';
 import { validationResult } from 'express-validator';
 import { createLogger } from '../utils/logger';
@@ -221,6 +222,14 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     const payload = verifyRefreshToken(refreshToken);
+
+    if (await isTokenRevoked(refreshToken)) {
+      logger.warn('Refresh token failed - token revoked', { userId: payload.userId });
+      const error = createErrorResponse(ErrorCode.TOKEN_INVALID);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
     const user = await User.findById(payload.userId);
     if (!user) {
       logger.warn('Refresh token failed - user not found', { userId: payload.userId });
@@ -231,6 +240,9 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
 
     const newToken = generateAccessToken(user);
     const newRefreshToken = generateRefreshToken(user);
+
+    // Rotate: the presented refresh token dies with this exchange.
+    await revokeToken(refreshToken, 'refresh');
 
     logger.info('Token refreshed successfully', { userId: user._id });
 
@@ -246,6 +258,23 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
 };
 
 export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
+  // Revoke the access token (authenticate middleware verified it) and any
+  // refresh token the client sends along, so logout actually invalidates
+  // sessions instead of being a client-side no-op.
+  const authHeader = req.headers.authorization;
+  const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  const { refreshToken } = req.body as { refreshToken?: string };
+
+  try {
+    if (accessToken) await revokeToken(accessToken, 'access');
+    if (refreshToken) await revokeToken(refreshToken, 'refresh');
+  } catch (error) {
+    logger.error('Logout revocation failed', {
+      error: error instanceof Error ? error.message : String(error),
+      userId: req.user?.userId,
+    });
+  }
+
   logger.info('User logged out', { userId: req.user?.userId });
   res.json({ message: 'Logged out successfully' });
 };

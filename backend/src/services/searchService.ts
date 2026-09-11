@@ -1,4 +1,5 @@
 import { Skill } from '../models/Skill';
+import { escapeRegex } from '../utils/escapeRegex';
 import { Prompt } from '../models/Prompt';
 
 export interface SearchOptions {
@@ -273,7 +274,7 @@ export function highlightMatches(text: string, query: string): string {
     return text;
   }
 
-  const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const pattern = words.map((w) => escapeRegex(w)).join('|');
   const regex = new RegExp(`(${pattern})`, 'gi');
 
   return text.replace(regex, '<em>$1</em>');

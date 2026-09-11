@@ -1,14 +1,25 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
-import { register, login, refreshToken, logout, getMe, registerAdmin } from '../controllers/authController';
+import {
+  register,
+  login,
+  refreshToken,
+  logout,
+  getMe,
+  registerAdmin,
+} from '../controllers/authController';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { registerValidation, loginValidation, refreshTokenValidation } from '../validations/authValidation';
+import {
+  registerValidation,
+  loginValidation,
+  refreshTokenValidation,
+} from '../validations/authValidation';
 import {
   sendVerificationCode,
   verifyCode,
   forgotPassword,
   resetPassword,
-  changePassword
+  changePassword,
 } from '../controllers/passwordController';
 import { User } from '../models/User';
 import {
@@ -16,7 +27,7 @@ import {
   verifyCodeValidation,
   forgotPasswordValidation,
   resetPasswordValidation,
-  changePasswordValidation
+  changePasswordValidation,
 } from '../validations/passwordValidation';
 import { publicApiLimiter } from '../middleware/rateLimit';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
@@ -30,7 +41,7 @@ router.post('/register', publicApiLimiter, registerValidation, register);
 router.post('/register/admin', publicApiLimiter, registerValidation, registerAdmin);
 router.post('/login', publicApiLimiter, loginValidation, login);
 router.post('/refresh', refreshTokenValidation, refreshToken);
-router.post('/logout', logout);
+router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, getMe);
 
 router.post('/send-code', publicApiLimiter, sendCodeValidation, sendVerificationCode);
@@ -68,7 +79,7 @@ router.get('/verify-email/:token', async (req: AuthRequest, res: Response) => {
   try {
     const { token } = req.params;
     const user = await User.findOne({ emailVerificationToken: token });
-    
+
     if (!user) {
       const error = createErrorResponse(ErrorCode.INVALID_VERIFICATION_TOKEN);
       res.status(error.statusCode).json(error);

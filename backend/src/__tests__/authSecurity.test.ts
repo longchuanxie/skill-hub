@@ -100,4 +100,72 @@ describe('Auth Security', () => {
       await request(app).post('/api/auth/refresh').send({ refreshToken: accessToken }).expect(401);
     });
   });
+
+  describe('token revocation (logout / rotation)', () => {
+    let accessToken: string;
+    let refreshToken: string;
+
+    const login = async () => {
+      await request(app)
+        .post('/api/auth/register')
+        .send({
+          username: 'revokeuser',
+          email: 'revokeuser@example.com',
+          password: 'StrongPass123!',
+        })
+        .expect(201);
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: 'revokeuser@example.com',
+          password: 'StrongPass123!',
+        })
+        .expect(200);
+
+      accessToken = loginRes.body.token;
+      refreshToken = loginRes.body.refreshToken;
+    };
+
+    it('rejects the access token after logout', async () => {
+      await login();
+
+      await request(app)
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(401);
+    });
+
+    it('rejects the refresh token after logout', async () => {
+      await login();
+
+      await request(app)
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ refreshToken })
+        .expect(200);
+
+      await request(app).post('/api/auth/refresh').send({ refreshToken }).expect(401);
+    });
+
+    it('cannot replay a refresh token after rotation', async () => {
+      await login();
+
+      const first = await request(app).post('/api/auth/refresh').send({ refreshToken }).expect(200);
+
+      // The original refresh token was revoked by the rotation above.
+      await request(app).post('/api/auth/refresh').send({ refreshToken }).expect(401);
+
+      // The newly issued pair still works.
+      await request(app)
+        .post('/api/auth/refresh')
+        .send({ refreshToken: first.body.refreshToken })
+        .expect(200);
+    });
+  });
 });

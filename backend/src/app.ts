@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
+import mongoSanitize from 'express-mongo-sanitize';
 import path from 'path';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
@@ -73,6 +74,10 @@ app.use((req, res, next) => {
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Strip MongoDB operators ($gt, $ne, $where...) from user input to block
+// NoSQL operator injection in query filters.
+app.use(mongoSanitize());
 
 app.use('/uploads', express.static(path.resolve(getLocalPath())));
 
