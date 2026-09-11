@@ -4,42 +4,27 @@
 
 ---
 
-## Quick Install
+## Quick Start (From Source)
 
 ```bash
-npm install -g @xielc/skillhub
-```
-
-### Configuration
-
-After installation, configure environment variables:
-
-```bash
-# Navigate to installation directory
-cd $(npm root -g)/xielc/skillhub
-
-# Copy environment template
-cp backend/.env.example backend/.env
-
-# Edit backend/.env with your configuration (MongoDB, Redis, etc.)
-
-# Start the service
-npm start
-```
-
-Visit `http://localhost:3001` to access SkillHub.
-
----
-
-### From Source
-
-```bash
-git clone https://github.com/xielc/skill-hub.git
+git clone https://github.com/longchuanxie/skill-hub.git
 cd skill-hub
-npm install
+npm run install:all        # installs backend + frontend dependencies
 cp backend/.env.example backend/.env
-# Edit backend/.env
-npm start
+# Edit backend/.env (MongoDB URI, JWT secrets, SMTP, ...)
+npm run dev                # starts backend (3001) + frontend (5173) together
+```
+
+Visit `http://localhost:5173` to access SkillHub.
+
+> The backend requires `JWT_SECRET` and `JWT_REFRESH_SECRET` to be set in
+> production; the server refuses to start without them.
+
+### Production Build
+
+```bash
+npm run build:all          # builds frontend, then backend (tsc)
+npm start                  # NODE_ENV=production node backend/dist/server.js
 ```
 
 ---
@@ -55,6 +40,7 @@ SkillHub is an enterprise-grade AI resource management platform designed for dis
 ### Features
 
 #### Core Features
+
 - **Skills Management** - Upload, share, and download AI skill packages (ZIP format)
 - **Prompts Management** - Create, edit, and manage AI prompts with variable support
 - **Version Control** - Complete version history, comparison, and rollback capabilities
@@ -63,6 +49,7 @@ SkillHub is an enterprise-grade AI resource management platform designed for dis
 - **Agent API** - RESTful API with API Key authentication for external integrations
 
 #### Enterprise Features
+
 - **Multi-tenant Architecture** - Enterprise-level resource isolation and management
 - **OAuth Integration** - Support for GitHub and Google OAuth authentication
 - **Content Review** - Automated content moderation and approval workflow
@@ -71,6 +58,7 @@ SkillHub is an enterprise-grade AI resource management platform designed for dis
 - **API Keys Management** - Create and manage multiple API keys with permissions
 
 #### Community Features
+
 - **Social Interactions** - Likes, favorites, comments, and ratings
 - **Marketplace** - Public resource marketplace for community sharing
 - **Trending** - Community trends and popular resources
@@ -79,6 +67,7 @@ SkillHub is an enterprise-grade AI resource management platform designed for dis
 ### Tech Stack
 
 #### Backend
+
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Language**: TypeScript
@@ -90,6 +79,7 @@ SkillHub is an enterprise-grade AI resource management platform designed for dis
 - **Validation**: express-validator
 
 #### Frontend
+
 - **Framework**: React 18
 - **Language**: TypeScript
 - **Build Tool**: Vite
@@ -115,7 +105,7 @@ skill-hub/
 │   │   ├── config/            # Configuration files
 │   │   ├── validations/       # Input validation schemas
 │   │   ├── types/            # TypeScript type definitions
-│   │   └── app.ts            # Application entry
+│   │   ├── app.ts            # Express app definition
 │   ├── examples/             # Plugin examples
 │   └── __tests__/            # Unit tests
 ├── frontend/                  # Frontend application
@@ -144,6 +134,7 @@ skill-hub/
 ### Quick Start
 
 #### Prerequisites
+
 - Node.js >= 18.0.0
 - MongoDB >= 6.0
 - npm or yarn
@@ -180,19 +171,20 @@ npm run dev
 
 #### Environment Variables
 
-Create a `.env` file in the backend directory:
+Create a `.env` file in the backend directory (see `backend/.env.example`
+for the full annotated list):
 
 ```env
 # Server
-PORT=3002
+PORT=3001
 NODE_ENV=development
 
 # Database
 MONGODB_URI=mongodb://localhost:27017/skillhub
 
-# JWT
-JWT_SECRET=your-jwt-secret-key
-JWT_EXPIRES_IN=7d
+# JWT - both secrets are REQUIRED in production
+JWT_SECRET=change-me
+JWT_REFRESH_SECRET=change-me-too
 
 # CORS
 CORS_ORIGIN=http://localhost:5173
@@ -203,11 +195,13 @@ GITHUB_CLIENT_SECRET=your-github-client-secret
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 
-# Email (Optional)
+# SMTP (Optional)
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your-email
 SMTP_PASS=your-password
+SMTP_FROM_EMAIL=your-email
+SMTP_FROM_NAME=SkillHub
 ```
 
 ### API Documentation
@@ -299,55 +293,60 @@ POST /api/agent/prompts
 ### Data Models
 
 #### User
-| Field | Type | Description |
-|-------|------|-------------|
-| username | String | Unique username |
-| email | String | Unique email |
-| password | String | Hashed password |
-| avatar | String | Avatar URL |
-| enterpriseId | ObjectId | Enterprise reference |
-| apiKeys | Array | API keys for authentication |
+
+| Field        | Type     | Description                 |
+| ------------ | -------- | --------------------------- |
+| username     | String   | Unique username             |
+| email        | String   | Unique email                |
+| password     | String   | Hashed password             |
+| avatar       | String   | Avatar URL                  |
+| enterpriseId | ObjectId | Enterprise reference        |
+| apiKeys      | Array    | API keys for authentication |
 
 #### Skill
-| Field | Type | Description |
-|-------|------|-------------|
-| name | String | Skill name |
-| description | String | Description |
-| owner | ObjectId | Creator reference |
-| category | String | Category |
-| tags | Array | Tags |
-| files | Array | Uploaded files |
-| version | String | Current version |
-| versions | Array | Version history |
-| visibility | String | public/private/enterprise |
-| status | String | draft/pending/approved/rejected |
-| downloads | Number | Download count |
-| averageRating | Number | Average rating |
+
+| Field         | Type     | Description                     |
+| ------------- | -------- | ------------------------------- |
+| name          | String   | Skill name                      |
+| description   | String   | Description                     |
+| owner         | ObjectId | Creator reference               |
+| category      | String   | Category                        |
+| tags          | Array    | Tags                            |
+| files         | Array    | Uploaded files                  |
+| version       | String   | Current version                 |
+| versions      | Array    | Version history                 |
+| visibility    | String   | public/private/enterprise       |
+| status        | String   | draft/pending/approved/rejected |
+| downloads     | Number   | Download count                  |
+| averageRating | Number   | Average rating                  |
 
 #### Prompt
-| Field | Type | Description |
-|-------|------|-------------|
-| name | String | Prompt name |
-| description | String | Description |
-| content | String | Prompt content |
-| variables | Array | Variable definitions |
-| owner | ObjectId | Creator reference |
-| version | String | Current version |
-| versions | Array | Version history |
-| visibility | String | public/private/enterprise |
+
+| Field       | Type     | Description               |
+| ----------- | -------- | ------------------------- |
+| name        | String   | Prompt name               |
+| description | String   | Description               |
+| content     | String   | Prompt content            |
+| variables   | Array    | Variable definitions      |
+| owner       | ObjectId | Creator reference         |
+| version     | String   | Current version           |
+| versions    | Array    | Version history           |
+| visibility  | String   | public/private/enterprise |
 
 #### Agent
-| Field | Type | Description |
-|-------|------|-------------|
-| description | String | Agent description |
-| apiKey | String | API key for authentication |
-| owner | ObjectId | Owner reference |
-| permissions | Object | Read/write permissions |
-| usage | Object | Usage statistics |
+
+| Field       | Type     | Description                |
+| ----------- | -------- | -------------------------- |
+| description | String   | Agent description          |
+| apiKey      | String   | API key for authentication |
+| owner       | ObjectId | Owner reference            |
+| permissions | Object   | Read/write permissions     |
+| usage       | Object   | Usage statistics           |
 
 ### Internationalization
 
 SkillHub supports multiple languages:
+
 - English (en)
 - Chinese (zh)
 
@@ -370,6 +369,7 @@ SkillHub 是一个企业级 AI 资源管理平台，专为发现、分享和管�
 ### 功能特性
 
 #### 核心功能
+
 - **技能管理** - 上传、分享和下载 AI 技能包（ZIP 格式）
 - **提示词管理** - 创建、编辑和管理支持变量的 AI 提示词
 - **版本控制** - 完整的版本历史、版本对比和版本回滚功能
@@ -378,6 +378,7 @@ SkillHub 是一个企业级 AI 资源管理平台，专为发现、分享和管�
 - **Agent API** - 支持 API Key 认证的 RESTful API，便于外部系统集成
 
 #### 企业功能
+
 - **多租户架构** - 企业级资源隔离和管理
 - **OAuth 集成** - 支持 GitHub 和 Google OAuth 认证
 - **内容审核** - 自动化内容审核和审批工作流
@@ -386,6 +387,7 @@ SkillHub 是一个企业级 AI 资源管理平台，专为发现、分享和管�
 - **API 密钥管理** - 创建和管理多个具有权限的 API 密钥
 
 #### 社区功能
+
 - **社交互动** - 点赞、收藏、评论和评分
 - **资源市场** - 公开资源市场，支持社区分享
 - **热门趋势** - 社区趋势和热门资源展示
@@ -394,6 +396,7 @@ SkillHub 是一个企业级 AI 资源管理平台，专为发现、分享和管�
 ### 技术栈
 
 #### 后端
+
 - **运行时**: Node.js
 - **框架**: Express.js
 - **语言**: TypeScript
@@ -405,6 +408,7 @@ SkillHub 是一个企业级 AI 资源管理平台，专为发现、分享和管�
 - **验证**: express-validator
 
 #### 前端
+
 - **框架**: React 18
 - **语言**: TypeScript
 - **构建工具**: Vite
@@ -430,7 +434,7 @@ skill-hub/
 │   │   ├── config/            # 配置文件
 │   │   ├── validations/       # 输入验证模式
 │   │   ├── types/             # TypeScript 类型定义
-│   │   └── app.ts             # 应用入口
+│   │   ├── app.ts             # Express 应用定义
 │   ├── examples/              # 插件示例
 │   └── __tests__/             # 单元测试
 ├── frontend/                   # 前端应用
@@ -459,6 +463,7 @@ skill-hub/
 ### 快速开始
 
 #### 环境要求
+
 - Node.js >= 18.0.0
 - MongoDB >= 6.0
 - npm 或 yarn
@@ -614,55 +619,60 @@ POST /api/agent/prompts
 ### 数据模型
 
 #### 用户
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| username | String | 用户名（唯一） |
-| email | String | 邮箱（唯一） |
-| password | String | 加密密码 |
-| avatar | String | 头像 URL |
-| enterpriseId | ObjectId | 企业引用 |
-| apiKeys | Array | API 密钥列表 |
+
+| 字段         | 类型     | 描述           |
+| ------------ | -------- | -------------- |
+| username     | String   | 用户名（唯一） |
+| email        | String   | 邮箱（唯一）   |
+| password     | String   | 加密密码       |
+| avatar       | String   | 头像 URL       |
+| enterpriseId | ObjectId | 企业引用       |
+| apiKeys      | Array    | API 密钥列表   |
 
 #### 技能
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| name | String | 技能名称 |
-| description | String | 描述 |
-| owner | ObjectId | 创建者引用 |
-| category | String | 分类 |
-| tags | Array | 标签 |
-| files | Array | 上传的文件 |
-| version | String | 当前版本 |
-| versions | Array | 版本历史 |
-| visibility | String | public/private/enterprise |
-| status | String | draft/pending/approved/rejected |
-| downloads | Number | 下载次数 |
-| averageRating | Number | 平均评分 |
+
+| 字段          | 类型     | 描述                            |
+| ------------- | -------- | ------------------------------- |
+| name          | String   | 技能名称                        |
+| description   | String   | 描述                            |
+| owner         | ObjectId | 创建者引用                      |
+| category      | String   | 分类                            |
+| tags          | Array    | 标签                            |
+| files         | Array    | 上传的文件                      |
+| version       | String   | 当前版本                        |
+| versions      | Array    | 版本历史                        |
+| visibility    | String   | public/private/enterprise       |
+| status        | String   | draft/pending/approved/rejected |
+| downloads     | Number   | 下载次数                        |
+| averageRating | Number   | 平均评分                        |
 
 #### 提示词
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| name | String | 提示词名称 |
-| description | String | 描述 |
-| content | String | 提示词内容 |
-| variables | Array | 变量定义 |
-| owner | ObjectId | 创建者引用 |
-| version | String | 当前版本 |
-| versions | Array | 版本历史 |
-| visibility | String | public/private/enterprise |
+
+| 字段        | 类型     | 描述                      |
+| ----------- | -------- | ------------------------- |
+| name        | String   | 提示词名称                |
+| description | String   | 描述                      |
+| content     | String   | 提示词内容                |
+| variables   | Array    | 变量定义                  |
+| owner       | ObjectId | 创建者引用                |
+| version     | String   | 当前版本                  |
+| versions    | Array    | 版本历史                  |
+| visibility  | String   | public/private/enterprise |
 
 #### Agent
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| description | String | Agent 描述 |
-| apiKey | String | API 密钥 |
-| owner | ObjectId | 所有者引用 |
-| permissions | Object | 读写权限 |
-| usage | Object | 使用统计 |
+
+| 字段        | 类型     | 描述       |
+| ----------- | -------- | ---------- |
+| description | String   | Agent 描述 |
+| apiKey      | String   | API 密钥   |
+| owner       | ObjectId | 所有者引用 |
+| permissions | Object   | 读写权限   |
+| usage       | Object   | 使用统计   |
 
 ### 国际化
 
 SkillHub 支持多语言：
+
 - 英文
 - 中文
 

@@ -1,6 +1,6 @@
-# Backend - Agent Browser API
+# SkillHub Backend
 
-Agent Browser 后端服务，提供技能和提示词管理的 RESTful API。
+SkillHub 后端服务，提供技能和提示词管理的 RESTful API。
 
 ## 技术栈
 
@@ -105,6 +105,7 @@ npm start
 ### 认证接口
 
 #### 用户注册
+
 ```
 POST /api/auth/register
 Content-Type: application/json
@@ -117,6 +118,7 @@ Content-Type: application/json
 ```
 
 #### 用户登录
+
 ```
 POST /api/auth/login
 Content-Type: application/json
@@ -130,12 +132,14 @@ Content-Type: application/json
 ### 技能接口
 
 #### 获取技能列表
+
 ```
 GET /api/skills?page=1&pageSize=12&category=general&search=keyword
 Authorization: Bearer <token>
 ```
 
 #### 创建技能
+
 ```
 POST /api/skills
 Authorization: Bearer <token>
@@ -148,12 +152,14 @@ file: skill.zip
 ```
 
 #### 获取版本历史
+
 ```
 GET /api/skills/:id/versions
 Authorization: Bearer <token>
 ```
 
 #### 版本回滚
+
 ```
 POST /api/skills/:id/rollback/:version
 Authorization: Bearer <token>
@@ -162,12 +168,14 @@ Authorization: Bearer <token>
 ### 提示词接口
 
 #### 获取提示词列表
+
 ```
 GET /api/prompts?page=1&pageSize=12&category=general&search=keyword
 Authorization: Bearer <token>
 ```
 
 #### 创建提示词
+
 ```
 POST /api/prompts
 Authorization: Bearer <token>
@@ -191,6 +199,7 @@ Content-Type: application/json
 ```
 
 #### 版本对比
+
 ```
 GET /api/prompts/:id/compare?version1=1.0.0&version2=1.1.0
 Authorization: Bearer <token>
@@ -201,18 +210,21 @@ Authorization: Bearer <token>
 Agent API 使用 API Key 认证，适用于外部系统集成。
 
 #### 认证方式
+
 ```
 Headers:
   x-api-key: <your-api-key>
 ```
 
 #### 获取技能列表
+
 ```
 GET /api/agent/skills
 x-api-key: <your-api-key>
 ```
 
 #### 创建技能
+
 ```
 POST /api/agent/skills
 x-api-key: <your-api-key>
@@ -226,6 +238,7 @@ file: skill.zip
 ## 数据模型
 
 ### User
+
 ```typescript
 {
   username: string;
@@ -243,6 +256,7 @@ file: skill.zip
 ```
 
 ### Skill
+
 ```typescript
 {
   name: string;
@@ -269,6 +283,7 @@ file: skill.zip
 ```
 
 ### Prompt
+
 ```typescript
 {
   name: string;
@@ -298,6 +313,7 @@ file: skill.zip
 ```
 
 ### Agent
+
 ```typescript
 {
   description: string;
@@ -319,23 +335,30 @@ file: skill.zip
 ## 版本控制实现
 
 ### 版本保存
+
 每次更新资源时，自动将当前版本保存到 `versions` 数组：
+
 - 记录版本号、内容、描述、变量等信息
 - 自动生成版本号（基于时间戳或语义化版本）
 
 ### 版本对比
+
 通过 `compare` 接口对比两个版本的差异：
+
 - 内容变更检测
 - 描述变更检测
 - 变量变更检测
 
 ### 版本回滚
+
 回滚到指定版本时：
+
 1. 将当前版本保存到历史记录
 2. 恢复目标版本的内容
 3. 生成新的版本号（如 `1.0.0-restored`）
 
 ## mongoDB 索引启动命令
+
 "D:\workplace\idea\skill-hub\mongodb-win32-x86_64-windows-7.0.14\bin\mongod.exe" --port 27017 --dbpath "D:\workplace\idea\skill-hub\data"
 
 ## 数据库索引要求
@@ -350,18 +373,15 @@ file: skill.zip
 // 同一用户不能创建同名技能（复合唯一索引）
 db.skills.createIndex(
   { owner: 1, name: 1 },
-  { unique: true, partialFilterExpression: { name: { $exists: true, $ne: '' } } }
-)
+  { unique: true, partialFilterExpression: { name: { $exists: true, $ne: '' } } },
+);
 ```
 
 #### Prompt 模型索引
 
 ```javascript
 // 同一用户不能创建同名提示词（复合唯一索引）
-db.prompts.createIndex(
-  { owner: 1, name: 1 },
-  { unique: true }
-)
+db.prompts.createIndex({ owner: 1, name: 1 }, { unique: true });
 ```
 
 ### 数据清理
@@ -372,20 +392,33 @@ db.prompts.createIndex(
 // 查找 Skill 重复数据
 db.skills.aggregate([
   { $match: { name: { $exists: true, $ne: '' } } },
-  { $group: { _id: { owner: "$owner", name: "$name" }, count: { $sum: 1 }, docs: { $push: "$_id" } } },
-  { $match: { count: { $gt: 1 } } }
-])
+  {
+    $group: {
+      _id: { owner: '$owner', name: '$name' },
+      count: { $sum: 1 },
+      docs: { $push: '$_id' },
+    },
+  },
+  { $match: { count: { $gt: 1 } } },
+]);
 
 // 查找 Prompt 重复数据
 db.prompts.aggregate([
-  { $group: { _id: { owner: "$owner", name: "$name" }, count: { $sum: 1 }, docs: { $push: "$_id" } } },
-  { $match: { count: { $gt: 1 } } }
-])
+  {
+    $group: {
+      _id: { owner: '$owner', name: '$name' },
+      count: { $sum: 1 },
+      docs: { $push: '$_id' },
+    },
+  },
+  { $match: { count: { $gt: 1 } } },
+]);
 ```
 
 ### 同名资源版本管理
 
 当同一用户上传同名资源时，系统会自动：
+
 1. 检测 `owner + name` 组合是否已存在
 2. 如存在，自动创建新版本而非新建记录
 3. 版本号自动递增（如 1.0.0 → 1.0.1）

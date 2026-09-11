@@ -1,6 +1,6 @@
-# Frontend - Agent Browser UI
+# SkillHub Frontend
 
-Agent Browser 前端应用，基于 React 18 和 TypeScript 构建的技能与提示词管理界面。
+SkillHub 前端应用，基于 React 18 和 TypeScript 构建的技能与提示词管理界面。
 
 ## 技术栈
 
@@ -90,46 +90,54 @@ npm run preview
 ## 主要页面
 
 ### 公共页面
-| 路由 | 页面 | 说明 |
-|------|------|------|
-| `/` | Home | 首页，展示热门技能和提示词 |
-| `/login` | Login | 用户登录 |
-| `/register` | Register | 用户注册 |
-| `/skills` | Skills | 技能市场 |
-| `/prompts` | Prompts | 提示词市场 |
-| `/skills/:id` | SkillDetail | 技能详情 |
-| `/prompts/:id` | PromptDetail | 提示词详情 |
+
+| 路由           | 页面         | 说明                       |
+| -------------- | ------------ | -------------------------- |
+| `/`            | Home         | 首页，展示热门技能和提示词 |
+| `/login`       | Login        | 用户登录                   |
+| `/register`    | Register     | 用户注册                   |
+| `/skills`      | Skills       | 技能市场                   |
+| `/prompts`     | Prompts      | 提示词市场                 |
+| `/skills/:id`  | SkillDetail  | 技能详情                   |
+| `/prompts/:id` | PromptDetail | 提示词详情                 |
 
 ### 用户页面
-| 路由 | 页面 | 说明 |
-|------|------|------|
-| `/profile` | Profile | 个人中心 |
-| `/my/resources` | MyResources | 我的资源 |
-| `/settings` | Settings | 设置页面 |
-| `/settings/api-keys` | ApiKeys | API Key 管理 |
+
+| 路由                 | 页面        | 说明         |
+| -------------------- | ----------- | ------------ |
+| `/profile`           | Profile     | 个人中心     |
+| `/my/resources`      | MyResources | 我的资源     |
+| `/settings`          | Settings    | 设置页面     |
+| `/settings/api-keys` | ApiKeys     | API Key 管理 |
 
 ### 版本控制页面
-| 路由 | 页面 | 说明 |
-|------|------|------|
+
+| 路由                    | 页面                     | 说明           |
+| ----------------------- | ------------------------ | -------------- |
 | `/prompts/:id/versions` | PromptVersionHistoryPage | 提示词版本历史 |
-| `/prompts/:id/compare` | PromptVersionComparePage | 提示词版本对比 |
+| `/prompts/:id/compare`  | PromptVersionComparePage | 提示词版本对比 |
 
 ## 核心组件
 
 ### VersionCard
+
 版本卡片组件，用于展示版本信息：
+
 - 版本号和创建时间
 - 当前版本标识
 - 选中状态指示
 - 操作按钮（对比、回滚）
 
 ### VersionDiffPanel
+
 版本差异面板，用于展示两个版本的差异：
+
 - 内容变更高亮
 - 描述变更提示
 - 变量变更提示
 
 ### 布局组件
+
 - `Container` - 容器组件，支持最大宽度设置
 - `Flex` - 弹性布局组件
 - `Grid` - 网格布局组件
@@ -189,13 +197,14 @@ const prompt = await api.getPrompt(id);
 await api.createPrompt({
   name: 'My Prompt',
   content: '...',
-  variables: []
+  variables: [],
 });
 ```
 
 ## 样式规范
 
 使用 Tailwind CSS 进行样式开发：
+
 - 遵循移动优先原则
 - 使用语义化的颜色变量
 - 支持暗色模式
