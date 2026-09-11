@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { createLogger } from '../utils/logger';
 
@@ -26,7 +26,7 @@ interface CheckResult {
 
 const checkContent = (content: string): CheckResult => {
   const issues: string[] = [];
-  
+
   for (const pattern of DANGEROUS_PATTERNS) {
     if (pattern.test(content)) {
       issues.push(`Dangerous pattern detected: ${pattern.source}`);
@@ -39,24 +39,25 @@ const checkContent = (content: string): CheckResult => {
   };
 };
 
-export const contentSecurityCheck = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): void => {
+export const contentSecurityCheck = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const { name, description, content } = req.body;
   const allContent = [name, description, content].filter(Boolean).join(' ');
-  
-  logger.debug('Content security check', { hasName: !!name, hasDescription: !!description, hasContent: !!content, userId: req.user?.userId });
-  
+
+  logger.debug('Content security check', {
+    hasName: !!name,
+    hasDescription: !!description,
+    hasContent: !!content,
+    userId: req.user?.userId,
+  });
+
   const result = checkContent(allContent);
-  
+
   if (!result.safe) {
-    logger.warn('Content security check failed - dangerous patterns detected', { 
-      issues: result.issues, 
-      userId: req.user?.userId, 
+    logger.warn('Content security check failed - dangerous patterns detected', {
+      issues: result.issues,
+      userId: req.user?.userId,
       ip: req.ip,
-      path: req.path 
+      path: req.path,
     });
     res.status(400).json({
       error: 'Content contains potentially unsafe patterns',

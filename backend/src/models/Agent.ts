@@ -1,5 +1,6 @@
 import { Schema, Document, model } from 'mongoose';
 
+import crypto from 'crypto';
 export interface IAgent extends Document {
   description: string;
   apiKey: string;
@@ -22,58 +23,60 @@ export interface IAgent extends Document {
   updatedAt: Date;
 }
 
-const agentSchema = new Schema<IAgent>({
-  description: {
-    type: String,
-    default: '',
-  },
-  apiKey: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  endpoint: {
-    type: String,
-  },
-  isEnabled: {
-    type: Boolean,
-    default: true,
-  },
-  createdBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  owner: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-  },
-  enterpriseId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Enterprise',
-  },
-  permissions: {
-    canRead: { type: Boolean, default: true },
-    canWrite: { type: Boolean, default: false },
-    allowedResources: [{ type: String }],
-  },
-  usage: {
-    type: {
-      totalRequests: { type: Number, default: 0 },
-      lastUsed: { type: Date }
+const agentSchema = new Schema<IAgent>(
+  {
+    description: {
+      type: String,
+      default: '',
     },
-    default: { totalRequests: 0 }
+    apiKey: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    endpoint: {
+      type: String,
+    },
+    isEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    owner: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    enterpriseId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Enterprise',
+    },
+    permissions: {
+      canRead: { type: Boolean, default: true },
+      canWrite: { type: Boolean, default: false },
+      allowedResources: [{ type: String }],
+    },
+    usage: {
+      type: {
+        totalRequests: { type: Number, default: 0 },
+        lastUsed: { type: Date },
+      },
+      default: { totalRequests: 0 },
+    },
   },
-}, {
-  timestamps: true,
-});
+  {
+    timestamps: true,
+  },
+);
 
 agentSchema.index({ createdBy: 1 });
 agentSchema.index({ enterpriseId: 1 });
 agentSchema.index({ apiKey: 1 }, { unique: true });
 
-agentSchema.methods.regenerateApiKey = function() {
-  const crypto = require('crypto');
+agentSchema.methods.regenerateApiKey = function () {
   this.apiKey = crypto.randomBytes(32).toString('hex');
   return this.apiKey;
 };

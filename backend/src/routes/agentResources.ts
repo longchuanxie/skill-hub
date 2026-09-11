@@ -6,7 +6,6 @@ import { SkillVersion } from '../models/SkillVersion';
 import { PromptVersion } from '../models/PromptVersion';
 import { ResourceVersion } from '../models/ResourceVersion';
 import { skillFileUpload, getFileUrl } from '../middleware/upload';
-import { downloadSkill } from '../controllers/SkillController';
 import {
   determineResourceStatus,
   incrementVersion,
@@ -36,7 +35,7 @@ router.get('/skills', async (req: AgentRequest, res: Response) => {
         { visibility: 'public' },
         { owner: req.agent.owner },
         ...(req.agent.enterpriseId ? [{ enterpriseId: req.agent.enterpriseId }] : []),
-      ]
+      ],
     };
 
     if (category) query.category = category;
@@ -44,12 +43,17 @@ router.get('/skills', async (req: AgentRequest, res: Response) => {
 
     const [skills, total] = await Promise.all([
       Skill.find(query).populate('owner', 'username avatar').skip(skip).limit(Number(pageSize)),
-      Skill.countDocuments(query)
+      Skill.countDocuments(query),
     ]);
 
     res.json({
       skills,
-      pagination: { page: Number(page), pageSize: Number(pageSize), total, pages: Math.ceil(total / Number(pageSize)) }
+      pagination: {
+        page: Number(page),
+        pageSize: Number(pageSize),
+        total,
+        pages: Math.ceil(total / Number(pageSize)),
+      },
     });
   } catch (error) {
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
@@ -71,7 +75,7 @@ router.get('/prompts', async (req: AgentRequest, res: Response) => {
         { visibility: 'public' },
         { owner: req.agent.owner },
         ...(req.agent.enterpriseId ? [{ enterpriseId: req.agent.enterpriseId }] : []),
-      ]
+      ],
     };
 
     if (category) query.category = category;
@@ -79,12 +83,17 @@ router.get('/prompts', async (req: AgentRequest, res: Response) => {
 
     const [prompts, total] = await Promise.all([
       Prompt.find(query).populate('owner', 'username avatar').skip(skip).limit(Number(pageSize)),
-      Prompt.countDocuments(query)
+      Prompt.countDocuments(query),
     ]);
 
     res.json({
       prompts,
-      pagination: { page: Number(page), pageSize: Number(pageSize), total, pages: Math.ceil(total / Number(pageSize)) }
+      pagination: {
+        page: Number(page),
+        pageSize: Number(pageSize),
+        total,
+        pages: Math.ceil(total / Number(pageSize)),
+      },
     });
   } catch (error) {
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
@@ -137,14 +146,14 @@ router.post('/skills', skillFileUpload, async (req: AgentRequest, res: Response)
       return;
     }
 
-    const { name, description, category, tags, updateDescription } = req.body;
+    const { name } = req.body;
     const isEnterpriseAgent = !!req.agent.enterpriseId;
     const hasFile = req.file != null;
 
     if (hasFile && !req.file!.originalname.endsWith('.zip')) {
       res.status(400).json({
         error: 'INVALID_FILE_TYPE',
-        message: 'Only ZIP files are allowed'
+        message: 'Only ZIP files are allowed',
       });
       return;
     }
@@ -164,12 +173,17 @@ router.post('/skills', skillFileUpload, async (req: AgentRequest, res: Response)
     logger.error('Create skill error:', error);
     res.status(500).json({
       error: 'SERVER_ERROR',
-      message: 'Failed to create skill'
+      message: 'Failed to create skill',
     });
   }
 });
 
-async function handleSkillCreate(req: AgentRequest, res: Response, hasFile: boolean, isEnterpriseAgent: boolean) {
+async function handleSkillCreate(
+  req: AgentRequest,
+  res: Response,
+  hasFile: boolean,
+  isEnterpriseAgent: boolean,
+) {
   const { name, description, category, tags, updateDescription } = req.body;
 
   const skillData: any = {
@@ -189,13 +203,15 @@ async function handleSkillCreate(req: AgentRequest, res: Response, hasFile: bool
 
   if (hasFile) {
     const fileUrl = getFileUrl(req.file!.filename);
-    skillData.files = [{
-      filename: req.file!.originalname,
-      originalName: req.file!.originalname,
-      path: fileUrl,
-      size: req.file!.size,
-      mimetype: req.file!.mimetype,
-    }];
+    skillData.files = [
+      {
+        filename: req.file!.originalname,
+        originalName: req.file!.originalname,
+        path: fileUrl,
+        size: req.file!.size,
+        mimetype: req.file!.mimetype,
+      },
+    ];
   }
 
   const statusResult = await determineResourceStatus(
@@ -203,7 +219,7 @@ async function handleSkillCreate(req: AgentRequest, res: Response, hasFile: bool
     hasFile,
     isEnterpriseAgent,
     req.agent.enterpriseId,
-    { ...skillData, filePath: req.file?.path }
+    { ...skillData, filePath: req.file?.path },
   );
   skillData.status = statusResult.status;
 
@@ -237,7 +253,13 @@ async function handleSkillCreate(req: AgentRequest, res: Response, hasFile: bool
   res.status(201).json(response);
 }
 
-async function handleSkillUpdate(req: AgentRequest, res: Response, existingSkill: any, hasFile: boolean, isEnterpriseAgent: boolean) {
+async function handleSkillUpdate(
+  req: AgentRequest,
+  res: Response,
+  existingSkill: any,
+  hasFile: boolean,
+  isEnterpriseAgent: boolean,
+) {
   const { description, category, tags, updateDescription } = req.body;
 
   const previousVersion = existingSkill.version;
@@ -309,7 +331,7 @@ router.post('/prompts', async (req: AgentRequest, res: Response) => {
       return;
     }
 
-    const { name, description, content, variables, category, tags, updateDescription } = req.body;
+    const { name } = req.body;
     const isEnterpriseAgent = !!req.agent.enterpriseId;
 
     const existingPrompt = await Prompt.findOne({
@@ -327,7 +349,7 @@ router.post('/prompts', async (req: AgentRequest, res: Response) => {
     logger.error('Create prompt error:', error);
     res.status(500).json({
       error: 'SERVER_ERROR',
-      message: 'Failed to create prompt'
+      message: 'Failed to create prompt',
     });
   }
 });
@@ -356,7 +378,7 @@ async function handlePromptCreate(req: AgentRequest, res: Response, isEnterprise
     false,
     isEnterpriseAgent,
     req.agent.enterpriseId,
-    promptData
+    promptData,
   );
   promptData.status = statusResult.status;
 
@@ -399,7 +421,12 @@ async function handlePromptCreate(req: AgentRequest, res: Response, isEnterprise
   res.status(201).json(response);
 }
 
-async function handlePromptUpdate(req: AgentRequest, res: Response, existingPrompt: any, isEnterpriseAgent: boolean) {
+async function handlePromptUpdate(
+  req: AgentRequest,
+  res: Response,
+  existingPrompt: any,
+  isEnterpriseAgent: boolean,
+) {
   const { description, content, variables, category, tags, updateDescription } = req.body;
 
   const previousVersion = existingPrompt.version;
@@ -453,18 +480,23 @@ router.get('/check-update', async (req: AgentRequest, res: Response) => {
     const { resourceType, name, version } = req.query;
 
     if (!resourceType || !name || !version) {
-      res.status(400).json(createErrorResponse(
-        ErrorCode.MISSING_REQUIRED_FIELD,
-        'resourceType, name and version are required'
-      ));
+      res
+        .status(400)
+        .json(
+          createErrorResponse(
+            ErrorCode.MISSING_REQUIRED_FIELD,
+            'resourceType, name and version are required',
+          ),
+        );
       return;
     }
 
     if (resourceType !== 'skill' && resourceType !== 'prompt') {
-      res.status(400).json(createErrorResponse(
-        ErrorCode.INVALID_INPUT,
-        'resourceType must be "skill" or "prompt"'
-      ));
+      res
+        .status(400)
+        .json(
+          createErrorResponse(ErrorCode.INVALID_INPUT, 'resourceType must be "skill" or "prompt"'),
+        );
       return;
     }
 
@@ -484,10 +516,14 @@ router.get('/check-update', async (req: AgentRequest, res: Response) => {
       : await (Prompt as any).findOne(filter);
 
     if (!resource) {
-      res.status(404).json(createErrorResponse(
-        ErrorCode.RESOURCE_NOT_FOUND,
-        `No ${resourceType} found with the given name`
-      ));
+      res
+        .status(404)
+        .json(
+          createErrorResponse(
+            ErrorCode.RESOURCE_NOT_FOUND,
+            `No ${resourceType} found with the given name`,
+          ),
+        );
       return;
     }
 
@@ -497,10 +533,12 @@ router.get('/check-update', async (req: AgentRequest, res: Response) => {
       : await (PromptVersion as any).findOne(versionFilter).sort({ createdAt: -1 });
 
     const resourceVersionFilter: any = { resourceId: resource._id, resourceType };
-    const latestResourceVersion = await ResourceVersion.findOne(resourceVersionFilter)
-      .sort({ createdAt: -1 });
+    const latestResourceVersion = await ResourceVersion.findOne(resourceVersionFilter).sort({
+      createdAt: -1,
+    });
 
-    const latestVersion = latestVersionDoc?.version || latestResourceVersion?.version || resource.version;
+    const latestVersion =
+      latestVersionDoc?.version || latestResourceVersion?.version || resource.version;
 
     const hasUpdate = compareVersions(version as string, latestVersion) < 0;
 
@@ -515,7 +553,7 @@ router.get('/check-update', async (req: AgentRequest, res: Response) => {
     logger.error('Check update error:', error);
     res.status(500).json({
       error: 'SERVER_ERROR',
-      message: 'Failed to check for updates'
+      message: 'Failed to check for updates',
     });
   }
 });

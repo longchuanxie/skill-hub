@@ -17,7 +17,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
-    // eslint-disable-next-line no-console
     console.error('Unhandled UI error:', error);
   }
 
@@ -27,7 +26,9 @@ class ErrorBoundary extends Component<Props, State> {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
           <h1 className="text-2xl font-bold">页面出错了</h1>
           <p className="text-muted-foreground">发生了一些意外问题，请重试。</p>
-          <Link to="/" className="text-primary underline">返回首页</Link>
+          <Link to="/" className="text-primary underline">
+            返回首页
+          </Link>
         </div>
       );
     }

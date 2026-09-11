@@ -1,23 +1,20 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ApiType } from '../middleware/rateLimit/RateLimitOptions';
-import {
-  rateLimitManager,
-  publicApiLimiter,
-  externalApiLimiter,
-  authApiLimiter,
-  sensitiveApiLimiter,
-  dynamicRateLimit,
-} from '../middleware/rateLimit';
+import { rateLimitManager } from '../middleware/rateLimit';
 
 export function applyRouteRateLimits(): void {
+  // Lazy requires avoid circular imports with the route modules.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const authRouter = require('./auth').default;
-  const skillsRouter = require('./skills').default;
-  const agentsRouter = require('./agents').default;
-  const promptsRouter = require('./prompts').default;
 
   if (authRouter) {
     authRouter.stack = authRouter.stack.filter((layer: any) => {
-      return !layer.route || !layer.route.path.match(/^\/(login|register|send-code|verify-code|forgot-password|reset-password)$/);
+      return (
+        !layer.route ||
+        !layer.route.path.match(
+          /^\/(login|register|send-code|verify-code|forgot-password|reset-password)$/,
+        )
+      );
     });
   }
 }
@@ -60,9 +57,7 @@ export function matchRouteRateLimit(path: string, method: string): ApiType | nul
   return null;
 }
 
-export function createMatchedRateLimitMiddleware(
-  getPath: (req: Request) => string
-) {
+export function createMatchedRateLimitMiddleware(getPath: (req: Request) => string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const path = getPath(req);
     const apiType = matchRouteRateLimit(path, req.method);
@@ -102,7 +97,13 @@ router.get('/status', (req: Request, res: Response) => {
 });
 
 router.post('/config', (req: Request, res: Response) => {
-  const { enabled, public: publicConfig, auth: authConfig, sensitive: sensitiveConfig, external: externalConfig } = req.body;
+  const {
+    enabled,
+    public: publicConfig,
+    auth: authConfig,
+    sensitive: sensitiveConfig,
+    external: externalConfig,
+  } = req.body;
 
   if (enabled !== undefined) {
     rateLimitManager.setEnabled(enabled);

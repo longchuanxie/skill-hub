@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import './config/env';
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -10,7 +10,7 @@ import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { enterpriseMiddleware } from './middleware/enterpriseMiddleware';
 import { initializeEnterpriseContext, enterpriseContext } from './config/enterpriseContext';
-import { getLocalPath, getBaseUrl } from './config/storage';
+import { getLocalPath } from './config/storage';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import skillRoutes from './routes/skills';
@@ -41,14 +41,20 @@ import { ErrorCode, createErrorResponse } from './utils/errors';
 const app: Application = express();
 
 app.use(helmet());
-app.use(cors({
-  origin: [process.env.CORS_ORIGIN || 'http://localhost:5173', 'http://localhost:5175', 'http://localhost:5174'],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [
+      process.env.CORS_ORIGIN || 'http://localhost:5173',
+      'http://localhost:5175',
+      'http://localhost:5174',
+    ],
+    credentials: true,
+  }),
+);
 
 app.use((req, res, next) => {
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.info('HTTP Request', {
@@ -60,7 +66,7 @@ app.use((req, res, next) => {
       userAgent: req.get('user-agent'),
     });
   });
-  
+
   next();
 });
 
@@ -86,12 +92,14 @@ app.get('/api/health', async (req: Request, res: Response) => {
   res.status(dbOk ? 200 : 503).json({
     status: dbOk ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
-    enterprise: enterpriseContext.isSingleTenantMode() ? {
-      mode: 'single-tenant',
-      enterpriseId: enterpriseContext.getEnterpriseId(),
-    } : {
-      mode: 'multi-tenant',
-    }
+    enterprise: enterpriseContext.isSingleTenantMode()
+      ? {
+          mode: 'single-tenant',
+          enterpriseId: enterpriseContext.getEnterpriseId(),
+        }
+      : {
+          mode: 'multi-tenant',
+        },
   });
 });
 

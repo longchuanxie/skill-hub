@@ -8,17 +8,23 @@ import { AuthRequest } from '../middleware/auth';
 import { validationResult } from 'express-validator';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
-import { MAX_LOGIN_ATTEMPTS, LOCK_TIME } from '../models/User';
+import { MAX_LOGIN_ATTEMPTS } from '../models/User';
 
 const logger = createLogger('authController');
 
 export const register = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    logger.info('User registration attempt', { email: req.body.email, username: req.body.username });
-    
+    logger.info('User registration attempt', {
+      email: req.body.email,
+      username: req.body.username,
+    });
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      logger.warn('Registration validation failed', { errors: errors.array(), email: req.body.email });
+      logger.warn('Registration validation failed', {
+        errors: errors.array(),
+        email: req.body.email,
+      });
       res.status(400).json({ errors: errors.array() });
       return;
     }
@@ -47,7 +53,11 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
     const token = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    logger.info('User registered successfully', { userId: user._id, email: user.email, username: user.username });
+    logger.info('User registered successfully', {
+      userId: user._id,
+      email: user.email,
+      username: user.username,
+    });
 
     res.status(201).json({
       user: {
@@ -62,8 +72,12 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
   } catch (error: any) {
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0];
-      logger.warn('Duplicate key error on registration', { field, email: req.body.email, username: req.body.username });
-      
+      logger.warn('Duplicate key error on registration', {
+        field,
+        email: req.body.email,
+        username: req.body.username,
+      });
+
       if (field === 'email') {
         const err = createErrorResponse(ErrorCode.EMAIL_TAKEN);
         res.status(err.statusCode).json(err);
@@ -74,8 +88,12 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
         return;
       }
     }
-    
-    logger.error('Registration failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, email: req.body.email });
+
+    logger.error('Registration failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      email: req.body.email,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -84,7 +102,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
 export const login = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     logger.info('User login attempt', { email: req.body.email });
-    
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       logger.warn('Login validation failed', { errors: errors.array(), email: req.body.email });
@@ -104,7 +122,9 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     if (user.isLocked()) {
-      const remainingTime = user.lockUntil ? Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000) : 15;
+      const remainingTime = user.lockUntil
+        ? Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000)
+        : 15;
       logger.warn('Login failed - account locked', { userId: user._id, email, remainingTime });
       const error = createErrorResponse(ErrorCode.ACCOUNT_LOCKED, { remainingTime });
       res.status(error.statusCode).json(error);
@@ -114,13 +134,20 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     if (user.enterpriseId) {
       const enterprise = await Enterprise.findById(user.enterpriseId);
       if (enterprise && !enterprise.settings.auth.passwordLoginEnabled) {
-        const isEnterpriseAdmin = enterprise.owner.toString() === user._id.toString() ||
-          enterprise.members.some(m => m.userId.toString() === user._id.toString() && m.role === 'admin');
-        
+        const isEnterpriseAdmin =
+          enterprise.owner.toString() === user._id.toString() ||
+          enterprise.members.some(
+            (m) => m.userId.toString() === user._id.toString() && m.role === 'admin',
+          );
+
         if (!isEnterpriseAdmin) {
-          logger.warn('Login failed - password login disabled for enterprise', { userId: user._id, enterpriseId: user.enterpriseId });
-          const error = createErrorResponse(ErrorCode.FORBIDDEN, { 
-            message: 'Password login is disabled for this enterprise. Please use SSO/OAuth to login.' 
+          logger.warn('Login failed - password login disabled for enterprise', {
+            userId: user._id,
+            enterpriseId: user.enterpriseId,
+          });
+          const error = createErrorResponse(ErrorCode.FORBIDDEN, {
+            message:
+              'Password login is disabled for this enterprise. Please use SSO/OAuth to login.',
           });
           res.status(error.statusCode).json(error);
           return;
@@ -133,13 +160,13 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
       await user.incLoginAttempts();
       const attemptsLeft = MAX_LOGIN_ATTEMPTS - user.loginAttempts;
       logger.warn('Login failed - invalid password', { userId: user._id, email, attemptsLeft });
-      
+
       if (attemptsLeft <= 0) {
         const error = createErrorResponse(ErrorCode.ACCOUNT_LOCKED, { remainingTime: 15 });
         res.status(error.statusCode).json(error);
         return;
       }
-      
+
       const error = createErrorResponse(ErrorCode.INVALID_CREDENTIALS, { attemptsLeft });
       res.status(error.statusCode).json(error);
       return;
@@ -153,7 +180,12 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     const token = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    logger.info('User logged in successfully', { userId: user._id, email: user.email, username: user.username, ip: clientIp });
+    logger.info('User logged in successfully', {
+      userId: user._id,
+      email: user.email,
+      username: user.username,
+      ip: clientIp,
+    });
 
     res.json({
       user: {
@@ -168,7 +200,11 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
       refreshToken,
     });
   } catch (error) {
-    logger.error('Login failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, email: req.body.email });
+    logger.error('Login failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      email: req.body.email,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -200,7 +236,10 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
 
     res.json({ token: newToken, refreshToken: newRefreshToken });
   } catch (error) {
-    logger.error('Refresh token failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+    logger.error('Refresh token failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     const err = createErrorResponse(ErrorCode.TOKEN_INVALID);
     res.status(err.statusCode).json(err);
   }
@@ -223,7 +262,11 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
     logger.debug('Get user info', { userId: user._id });
     res.json(user);
   } catch (error) {
-    logger.error('Get user failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    logger.error('Get user failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.user?.userId,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -231,11 +274,17 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
 
 export const registerAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    logger.info('Admin registration attempt', { email: req.body.email, username: req.body.username });
-    
+    logger.info('Admin registration attempt', {
+      email: req.body.email,
+      username: req.body.username,
+    });
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      logger.warn('Admin registration validation failed', { errors: errors.array(), email: req.body.email });
+      logger.warn('Admin registration validation failed', {
+        errors: errors.array(),
+        email: req.body.email,
+      });
       res.status(400).json({ errors: errors.array() });
       return;
     }
@@ -252,14 +301,21 @@ export const registerAdmin = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     if (!invitation.isValid()) {
-      logger.warn('Admin registration failed - invitation invalid', { inviteCode, status: invitation.status, expiresAt: invitation.expiresAt });
+      logger.warn('Admin registration failed - invitation invalid', {
+        inviteCode,
+        status: invitation.status,
+        expiresAt: invitation.expiresAt,
+      });
       res.status(400).json({ message: '邀请已过期或已被使用' });
       return;
     }
 
     // 确保邮箱匹配
     if (email.toLowerCase() !== invitation.email) {
-      logger.warn('Admin registration failed - email mismatch', { providedEmail: email, invitationEmail: invitation.email });
+      logger.warn('Admin registration failed - email mismatch', {
+        providedEmail: email,
+        invitationEmail: invitation.email,
+      });
       res.status(400).json({ message: '邮箱与邀请不匹配' });
       return;
     }
@@ -281,10 +337,10 @@ export const registerAdmin = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     // 创建管理员用户
-    const user = new User({ 
-      username, 
-      email: email.toLowerCase(), 
-      password, 
+    const user = new User({
+      username,
+      email: email.toLowerCase(),
+      password,
       role: invitation.role,
       isEmailVerified: true, // 管理员注册自动验证邮箱
     });
@@ -307,7 +363,12 @@ export const registerAdmin = async (req: AuthRequest, res: Response): Promise<vo
       userAgent: req.get('user-agent'),
     });
 
-    logger.info('Admin registered successfully', { userId: user._id, email: user.email, username: user.username, role: user.role });
+    logger.info('Admin registered successfully', {
+      userId: user._id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+    });
 
     res.status(201).json({
       user: {
@@ -323,8 +384,12 @@ export const registerAdmin = async (req: AuthRequest, res: Response): Promise<vo
   } catch (error: any) {
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0];
-      logger.warn('Duplicate key error on admin registration', { field, email: req.body.email, username: req.body.username });
-      
+      logger.warn('Duplicate key error on admin registration', {
+        field,
+        email: req.body.email,
+        username: req.body.username,
+      });
+
       if (field === 'email') {
         const err = createErrorResponse(ErrorCode.EMAIL_TAKEN);
         res.status(err.statusCode).json(err);
@@ -335,8 +400,12 @@ export const registerAdmin = async (req: AuthRequest, res: Response): Promise<vo
         return;
       }
     }
-    
-    logger.error('Admin registration failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, email: req.body.email });
+
+    logger.error('Admin registration failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      email: req.body.email,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }

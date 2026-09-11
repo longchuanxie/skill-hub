@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
+import { enterpriseContext } from './config/enterpriseContext';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -36,20 +37,22 @@ const app: Application = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
-const corsOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',') 
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
   : ['http://localhost:5173'];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || corsOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || corsOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  }),
+);
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -61,17 +64,18 @@ initializeEnterpriseContext();
 app.use(enterpriseMiddleware);
 
 app.get('/api/health', (req: Request, res: Response) => {
-  const { enterpriseContext } = require('./config/enterpriseContext');
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     mongodb: 'in-memory',
-    enterprise: enterpriseContext.isSingleTenantMode() ? {
-      mode: 'single-tenant',
-      enterpriseId: enterpriseContext.getEnterpriseId(),
-    } : {
-      mode: 'multi-tenant',
-    }
+    enterprise: enterpriseContext.isSingleTenantMode()
+      ? {
+          mode: 'single-tenant',
+          enterpriseId: enterpriseContext.getEnterpriseId(),
+        }
+      : {
+          mode: 'multi-tenant',
+        },
   });
 });
 
@@ -107,26 +111,26 @@ let mongoServer: MongoMemoryServer;
 async function startServer() {
   try {
     logger.info('Starting in-memory MongoDB server...', { port: PORT });
-    
+
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
     logger.info(`Starting in-memory MongoDB at: ${mongoUri}`);
-    
+
     await mongoose.connect(mongoUri);
     logger.info('Connected to in-memory MongoDB');
-    
+
     app.listen(PORT, () => {
-      logger.info(`Server is running on port ${PORT}`, { 
-        port: PORT, 
+      logger.info(`Server is running on port ${PORT}`, {
+        port: PORT,
         environment: process.env.NODE_ENV || 'development',
         mode: 'in-memory',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     });
   } catch (error) {
-    logger.error('Failed to start server', { 
+    logger.error('Failed to start server', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
     process.exit(1);
   }

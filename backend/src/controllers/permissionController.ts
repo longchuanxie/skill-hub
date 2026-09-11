@@ -39,17 +39,19 @@ export const getPermissions = async (req: AuthRequest, res: Response): Promise<v
         visibility: skill.visibility,
         allowComments: true,
         allowForks: true,
-        collaborators: []
+        collaborators: [],
       });
       await permissions.save();
     }
 
     res.json({
       success: true,
-      data: permissions
+      data: permissions,
     });
   } catch (error) {
-    logger.error('Get permissions error', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Get permissions error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -58,7 +60,7 @@ export const getPermissions = async (req: AuthRequest, res: Response): Promise<v
 export const updatePermissions = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { skillId } = req.params;
-    const { visibility, password, allowComments, allowForks } = req.body;
+    const { visibility, allowComments, allowForks } = req.body;
 
     if (!req.user?.userId) {
       const error = createErrorResponse(ErrorCode.UNAUTHORIZED);
@@ -98,15 +100,17 @@ export const updatePermissions = async (req: AuthRequest, res: Response): Promis
       skillId,
       action: 'update',
       details: { old: oldPermissions, new: permissions.toObject() },
-      performedBy: req.user.userId
+      performedBy: req.user.userId,
     }).save();
 
     res.json({
       success: true,
-      data: permissions
+      data: permissions,
     });
   } catch (error) {
-    logger.error('Update permissions error', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Update permissions error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -137,7 +141,10 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
     }
 
     if (String(skill.owner) === userId) {
-      const error = createErrorResponse(ErrorCode.OPERATION_NOT_ALLOWED, 'Cannot add owner as collaborator');
+      const error = createErrorResponse(
+        ErrorCode.OPERATION_NOT_ALLOWED,
+        'Cannot add owner as collaborator',
+      );
       res.status(error.statusCode).json(error);
       return;
     }
@@ -152,7 +159,10 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
     const owner = await User.findById(req.user.userId);
     if (owner?.enterpriseId) {
       if (!user.enterpriseId || String(user.enterpriseId) !== String(owner.enterpriseId)) {
-        const error = createErrorResponse(ErrorCode.ACCESS_DENIED, 'Collaborators must be from the same enterprise');
+        const error = createErrorResponse(
+          ErrorCode.ACCESS_DENIED,
+          'Collaborators must be from the same enterprise',
+        );
         res.status(error.statusCode).json(error);
         return;
       }
@@ -163,12 +173,13 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
       permissions = new SkillPermissions({ skillId });
     }
 
-    const existingCollaborator = permissions.collaborators.find(
-      c => String(c.userId) === userId
-    );
+    const existingCollaborator = permissions.collaborators.find((c) => String(c.userId) === userId);
 
     if (existingCollaborator) {
-      const error = createErrorResponse(ErrorCode.DUPLICATE_RESOURCE, 'User is already a collaborator');
+      const error = createErrorResponse(
+        ErrorCode.DUPLICATE_RESOURCE,
+        'User is already a collaborator',
+      );
       res.status(error.statusCode).json(error);
       return;
     }
@@ -178,7 +189,7 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
       username: user.username,
       role: role || 'viewer',
       addedBy: req.user.userId as any,
-      addedAt: new Date()
+      addedAt: new Date(),
     });
 
     await permissions.save();
@@ -187,21 +198,26 @@ export const addCollaborator = async (req: AuthRequest, res: Response): Promise<
       skillId,
       action: 'add_collaborator',
       details: { userId, username: user.username, role },
-      performedBy: req.user.userId
+      performedBy: req.user.userId,
     }).save();
 
     res.json({
       success: true,
-      data: permissions
+      data: permissions,
     });
   } catch (error) {
-    logger.error('Add collaborator error', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Add collaborator error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
 };
 
-export const updateCollaboratorPermission = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateCollaboratorPermission = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const { skillId, userId } = req.params;
     const { role } = req.body;
@@ -232,9 +248,7 @@ export const updateCollaboratorPermission = async (req: AuthRequest, res: Respon
       return;
     }
 
-    const collaborator = permissions.collaborators.find(
-      c => String(c.userId) === userId
-    );
+    const collaborator = permissions.collaborators.find((c) => String(c.userId) === userId);
 
     if (!collaborator) {
       const error = createErrorResponse(ErrorCode.USER_NOT_FOUND, 'Collaborator not found');
@@ -251,15 +265,17 @@ export const updateCollaboratorPermission = async (req: AuthRequest, res: Respon
       skillId,
       action: 'update_role',
       details: { userId, oldRole, newRole: role },
-      performedBy: req.user.userId
+      performedBy: req.user.userId,
     }).save();
 
     res.json({
       success: true,
-      data: permissions
+      data: permissions,
     });
   } catch (error) {
-    logger.error('Update collaborator error', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Update collaborator error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -296,7 +312,7 @@ export const removeCollaborator = async (req: AuthRequest, res: Response): Promi
     }
 
     const collaboratorIndex = permissions.collaborators.findIndex(
-      c => String(c.userId) === userId
+      (c) => String(c.userId) === userId,
     );
 
     if (collaboratorIndex === -1) {
@@ -314,16 +330,18 @@ export const removeCollaborator = async (req: AuthRequest, res: Response): Promi
       skillId,
       action: 'remove_collaborator',
       details: { userId, username: removedCollaborator.username },
-      performedBy: req.user.userId
+      performedBy: req.user.userId,
     }).save();
 
     res.json({
       success: true,
       message: 'Collaborator removed',
-      data: permissions
+      data: permissions,
     });
   } catch (error) {
-    logger.error('Remove collaborator error', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Remove collaborator error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -358,10 +376,12 @@ export const getPermissionAuditLogs = async (req: AuthRequest, res: Response): P
 
     res.json({
       success: true,
-      data: logs
+      data: logs,
     });
   } catch (error) {
-    logger.error('Get audit logs error', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Get audit logs error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -399,7 +419,10 @@ export const checkPermission = async (req: AuthRequest, res: Response): Promise<
         reason = 'Skill is public';
       } else if (isEnterprise && req.user?.userId) {
         const currentUser = await User.findById(req.user.userId);
-        if (currentUser?.enterpriseId && String(currentUser.enterpriseId) === String(ownerEnterpriseId)) {
+        if (
+          currentUser?.enterpriseId &&
+          String(currentUser.enterpriseId) === String(ownerEnterpriseId)
+        ) {
           hasPermission = true;
           reason = 'User is from same enterprise';
         }
@@ -415,18 +438,24 @@ export const checkPermission = async (req: AuthRequest, res: Response): Promise<
       const permissions = await SkillPermissions.findOne({ skillId });
       if (permissions) {
         const collaborator = permissions.collaborators.find(
-          c => String(c.userId) === req.user?.userId
+          (c) => String(c.userId) === req.user?.userId,
         );
         if (collaborator) {
           const currentUser = await User.findById(req.user.userId);
           if (ownerEnterpriseId) {
-            if (!currentUser?.enterpriseId || String(currentUser.enterpriseId) !== String(ownerEnterpriseId)) {
+            if (
+              !currentUser?.enterpriseId ||
+              String(currentUser.enterpriseId) !== String(ownerEnterpriseId)
+            ) {
               reason = 'Collaborator must be from same enterprise';
             } else {
               if (permission === 'view') {
                 hasPermission = true;
                 reason = 'User is collaborator from same enterprise';
-              } else if (permission === 'edit' && (collaborator.role === 'editor' || collaborator.role === 'admin')) {
+              } else if (
+                permission === 'edit' &&
+                (collaborator.role === 'editor' || collaborator.role === 'admin')
+              ) {
                 hasPermission = true;
                 reason = 'User is editor/admin from same enterprise';
               } else if (permission === 'manage' && collaborator.role === 'admin') {
@@ -438,7 +467,10 @@ export const checkPermission = async (req: AuthRequest, res: Response): Promise<
             if (permission === 'view') {
               hasPermission = true;
               reason = 'User is collaborator';
-            } else if (permission === 'edit' && (collaborator.role === 'editor' || collaborator.role === 'admin')) {
+            } else if (
+              permission === 'edit' &&
+              (collaborator.role === 'editor' || collaborator.role === 'admin')
+            ) {
               hasPermission = true;
               reason = 'User is editor/admin';
             } else if (permission === 'manage' && collaborator.role === 'admin') {
@@ -454,11 +486,13 @@ export const checkPermission = async (req: AuthRequest, res: Response): Promise<
       success: true,
       data: {
         hasPermission,
-        reason
-      }
+        reason,
+      },
     });
   } catch (error) {
-    logger.error('Check permission error', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Check permission error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }

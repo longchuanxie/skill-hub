@@ -1,15 +1,13 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { 
-  createEnterprise, 
-  getEnterprise, 
-  getMyEnterprise, 
+import {
+  createEnterprise,
+  getEnterprise,
+  getMyEnterprise,
   updateEnterprise,
   inviteMember,
   getInvitations,
   cancelInvitation,
-  acceptInvitation,
-  declineInvitation,
   removeMember,
   updateMemberRole,
   leaveEnterprise,
@@ -17,7 +15,7 @@ import {
   getAuthSettings,
   getAuthSettingsPublic,
   getResourceReviewSettings,
-  updateResourceReviewSettings
+  updateResourceReviewSettings,
 } from '../controllers/enterpriseController';
 import { body } from 'express-validator';
 import { enterpriseLogoUpload } from '../middleware/upload';

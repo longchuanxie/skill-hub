@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { search, getSearchSuggestions, highlightMatches, SearchOptions } from '../services/searchService';
+import { search, getSearchSuggestions } from '../services/searchService';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
 
@@ -8,14 +8,7 @@ const logger = createLogger('SearchController');
 
 export const searchResources = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const {
-      q,
-      type = 'all',
-      category,
-      page = 1,
-      limit = 20,
-      sort = 'relevance'
-    } = req.query;
+    const { q, type = 'all', category, page = 1, limit = 20, sort = 'relevance' } = req.query;
 
     if (!q || typeof q !== 'string' || q.trim().length === 0) {
       const error = createErrorResponse(ErrorCode.INVALID_INPUT, 'Search query is required');
@@ -30,13 +23,13 @@ export const searchResources = async (req: AuthRequest, res: Response): Promise<
       category: category as string,
       page: Number(page),
       limit: Number(limit),
-      sort: sort as 'relevance' | 'latest' | 'popular'
+      sort: sort as 'relevance' | 'latest' | 'popular',
     });
 
     logger.info('Search completed', {
       query: q,
       totalResults: result.meta.totalResults,
-      took: result.meta.took
+      took: result.meta.took,
     });
 
     res.json({
@@ -46,22 +39,22 @@ export const searchResources = async (req: AuthRequest, res: Response): Promise<
           items: result.skills.items,
           total: result.skills.total,
           page: result.skills.page,
-          totalPages: result.skills.totalPages
+          totalPages: result.skills.totalPages,
         },
         prompts: {
           items: result.prompts.items,
           total: result.prompts.total,
           page: result.prompts.page,
-          totalPages: result.prompts.totalPages
-        }
+          totalPages: result.prompts.totalPages,
+        },
       },
-      meta: result.meta
+      meta: result.meta,
     });
   } catch (error) {
     logger.error('Search failed', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      query: req.query.q
+      query: req.query.q,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -75,7 +68,7 @@ export const getSuggestions = async (req: AuthRequest, res: Response): Promise<v
     if (!q || typeof q !== 'string' || q.trim().length < 2) {
       res.json({
         success: true,
-        data: []
+        data: [],
       });
       return;
     }
@@ -84,12 +77,12 @@ export const getSuggestions = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({
       success: true,
-      data: suggestions
+      data: suggestions,
     });
   } catch (error) {
     logger.error('Get suggestions failed', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -109,17 +102,17 @@ export const logSearch = async (req: AuthRequest, res: Response): Promise<void> 
     logger.info('Search logged', {
       userId: req.user?.userId,
       keyword,
-      type
+      type,
     });
 
     res.json({
       success: true,
-      message: 'Search logged successfully'
+      message: 'Search logged successfully',
     });
   } catch (error) {
     logger.error('Log search failed', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -136,12 +129,12 @@ export const getSearchHistory = async (req: AuthRequest, res: Response): Promise
 
     res.json({
       success: true,
-      data: []
+      data: [],
     });
   } catch (error) {
     logger.error('Get search history failed', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -160,12 +153,12 @@ export const clearSearchHistory = async (req: AuthRequest, res: Response): Promi
 
     res.json({
       success: true,
-      message: 'Search history cleared successfully'
+      message: 'Search history cleared successfully',
     });
   } catch (error) {
     logger.error('Clear search history failed', {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);

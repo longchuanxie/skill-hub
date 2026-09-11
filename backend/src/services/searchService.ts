@@ -1,6 +1,5 @@
 import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
-import { User } from '../models/User';
 
 export interface SearchOptions {
   query: string;
@@ -37,7 +36,9 @@ export interface SuggestionResult {
   resourceId: string;
 }
 
-export async function searchSkills(options: SearchOptions): Promise<{ items: any[]; total: number; textScores?: Map<string, number> }> {
+export async function searchSkills(
+  options: SearchOptions,
+): Promise<{ items: any[]; total: number; textScores?: Map<string, number> }> {
   const {
     query,
     category,
@@ -46,16 +47,15 @@ export async function searchSkills(options: SearchOptions): Promise<{ items: any
     sort = 'relevance',
     status = 'approved',
     visibility = 'public',
-    enterpriseId
+    enterpriseId,
   } = options;
 
-  const startTime = Date.now();
   const skip = (page - 1) * limit;
 
   const searchQuery: any = {
     $text: { $search: query },
     status,
-    visibility: { $in: [visibility, 'enterprise', 'shared'] }
+    visibility: { $in: [visibility, 'enterprise', 'shared'] },
   };
 
   if (category) {
@@ -63,10 +63,7 @@ export async function searchSkills(options: SearchOptions): Promise<{ items: any
   }
 
   if (enterpriseId) {
-    searchQuery.$or = [
-      { visibility: 'public' },
-      { enterpriseId }
-    ];
+    searchQuery.$or = [{ visibility: 'public' }, { enterpriseId }];
   }
 
   let sortOption: any;
@@ -81,10 +78,7 @@ export async function searchSkills(options: SearchOptions): Promise<{ items: any
   }
 
   const [items, total, textScores] = await Promise.all([
-    Skill.find(
-      searchQuery,
-      sort === 'relevance' ? { score: { $meta: 'textScore' } } : {}
-    )
+    Skill.find(searchQuery, sort === 'relevance' ? { score: { $meta: 'textScore' } } : {})
       .sort(sortOption)
       .skip(skip)
       .limit(limit)
@@ -92,13 +86,15 @@ export async function searchSkills(options: SearchOptions): Promise<{ items: any
     Skill.countDocuments(searchQuery),
     sort === 'relevance'
       ? getTextScores(Skill, searchQuery, query)
-      : Promise.resolve(new Map<string, number>())
+      : Promise.resolve(new Map<string, number>()),
   ]);
 
   return { items, total, textScores };
 }
 
-export async function searchPrompts(options: SearchOptions): Promise<{ items: any[]; total: number; textScores?: Map<string, number> }> {
+export async function searchPrompts(
+  options: SearchOptions,
+): Promise<{ items: any[]; total: number; textScores?: Map<string, number> }> {
   const {
     query,
     category,
@@ -107,7 +103,7 @@ export async function searchPrompts(options: SearchOptions): Promise<{ items: an
     sort = 'relevance',
     status = 'approved',
     visibility = 'public',
-    enterpriseId
+    enterpriseId,
   } = options;
 
   const skip = (page - 1) * limit;
@@ -115,7 +111,7 @@ export async function searchPrompts(options: SearchOptions): Promise<{ items: an
   const searchQuery: any = {
     $text: { $search: query },
     status,
-    visibility: { $in: [visibility, 'enterprise', 'shared'] }
+    visibility: { $in: [visibility, 'enterprise', 'shared'] },
   };
 
   if (category) {
@@ -123,10 +119,7 @@ export async function searchPrompts(options: SearchOptions): Promise<{ items: an
   }
 
   if (enterpriseId) {
-    searchQuery.$or = [
-      { visibility: 'public' },
-      { enterpriseId }
-    ];
+    searchQuery.$or = [{ visibility: 'public' }, { enterpriseId }];
   }
 
   let sortOption: any;
@@ -141,10 +134,7 @@ export async function searchPrompts(options: SearchOptions): Promise<{ items: an
   }
 
   const [items, total, textScores] = await Promise.all([
-    Prompt.find(
-      searchQuery,
-      sort === 'relevance' ? { score: { $meta: 'textScore' } } : {}
-    )
+    Prompt.find(searchQuery, sort === 'relevance' ? { score: { $meta: 'textScore' } } : {})
       .sort(sortOption)
       .skip(skip)
       .limit(limit)
@@ -152,7 +142,7 @@ export async function searchPrompts(options: SearchOptions): Promise<{ items: an
     Prompt.countDocuments(searchQuery),
     sort === 'relevance'
       ? getTextScores(Prompt, searchQuery, query)
-      : Promise.resolve(new Map<string, number>())
+      : Promise.resolve(new Map<string, number>()),
   ]);
 
   return { items, total, textScores };
@@ -161,7 +151,7 @@ export async function searchPrompts(options: SearchOptions): Promise<{ items: an
 async function getTextScores(
   model: any,
   query: any,
-  searchQuery: string
+  searchQuery: string,
 ): Promise<Map<string, number>> {
   const results = await model
     .find(query, { score: { $meta: 'textScore' } })
@@ -177,7 +167,10 @@ async function getTextScores(
   return textScores;
 }
 
-export async function search(query: string, options: Omit<SearchOptions, 'query'> = {}): Promise<SearchResponse> {
+export async function search(
+  query: string,
+  options: Omit<SearchOptions, 'query'> = {},
+): Promise<SearchResponse> {
   const startTime = Date.now();
   const { resourceType = 'all', ...restOptions } = options;
 
@@ -201,38 +194,37 @@ export async function search(query: string, options: Omit<SearchOptions, 'query'
       items: skillsResult.items,
       total: skillsResult.total,
       page: searchOptions.page || 1,
-      totalPages: Math.ceil(skillsResult.total / (searchOptions.limit || 20))
+      totalPages: Math.ceil(skillsResult.total / (searchOptions.limit || 20)),
     },
     prompts: {
       items: promptsResult.items,
       total: promptsResult.total,
       page: searchOptions.page || 1,
-      totalPages: Math.ceil(promptsResult.total / (searchOptions.limit || 20))
+      totalPages: Math.ceil(promptsResult.total / (searchOptions.limit || 20)),
     },
     meta: {
       query,
       took,
-      totalResults: skillsResult.total + promptsResult.total
-    }
+      totalResults: skillsResult.total + promptsResult.total,
+    },
   };
 }
 
 export async function getSearchSuggestions(
   query: string,
-  limit: number = 10
+  limit: number = 10,
 ): Promise<SuggestionResult[]> {
   if (!query || query.trim().length < 2) {
     return [];
   }
 
   const suggestions: SuggestionResult[] = [];
-  const searchRegex = new RegExp(query.split('').join('.*'), 'i');
 
   const [skills, prompts] = await Promise.all([
     Skill.find({
       $text: { $search: query },
       status: 'approved',
-      visibility: 'public'
+      visibility: 'public',
     })
       .sort({ score: { $meta: 'textScore' } })
       .limit(limit)
@@ -241,19 +233,19 @@ export async function getSearchSuggestions(
     Prompt.find({
       $text: { $search: query },
       status: 'approved',
-      visibility: 'public'
+      visibility: 'public',
     })
       .sort({ score: { $meta: 'textScore' } })
       .limit(limit)
       .select('_id name tags')
-      .lean()
+      .lean(),
   ]);
 
   skills.forEach((skill: any) => {
     suggestions.push({
       text: skill.name,
       type: 'skill',
-      resourceId: skill._id.toString()
+      resourceId: skill._id.toString(),
     });
   });
 
@@ -261,7 +253,7 @@ export async function getSearchSuggestions(
     suggestions.push({
       text: prompt.name,
       type: 'prompt',
-      resourceId: prompt._id.toString()
+      resourceId: prompt._id.toString(),
     });
   });
 
@@ -273,12 +265,15 @@ export function highlightMatches(text: string, query: string): string {
     return text;
   }
 
-  const words = query.trim().split(/\s+/).filter(w => w.length > 1);
+  const words = query
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
   if (words.length === 0) {
     return text;
   }
 
-  const pattern = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
   const regex = new RegExp(`(${pattern})`, 'gi');
 
   return text.replace(regex, '<em>$1</em>');
@@ -296,9 +291,10 @@ export function calculateQualityScore(resource: any): number {
   const usageScore = Math.min(resource.usageCount || 0, 200) / 200;
 
   return (
-    likeScore * likeWeight +
-    downloadScore * downloadWeight +
-    ratingScore * ratingWeight +
-    usageScore * usageWeight
-  ) * 100;
+    (likeScore * likeWeight +
+      downloadScore * downloadWeight +
+      ratingScore * ratingWeight +
+      usageScore * usageWeight) *
+    100
+  );
 }

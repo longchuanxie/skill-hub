@@ -15,7 +15,7 @@ export const createTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (!req.user?.userId) {
       res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
       return;
     }
@@ -24,7 +24,7 @@ export const createTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (!skill) {
       res.status(404).json({
         success: false,
-        error: 'Skill not found'
+        error: 'Skill not found',
       });
       return;
     }
@@ -32,7 +32,7 @@ export const createTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (String(skill.owner) !== req.user.userId) {
       res.status(403).json({
         success: false,
-        error: 'Not authorized to create test case'
+        error: 'Not authorized to create test case',
       });
       return;
     }
@@ -44,20 +44,20 @@ export const createTestCase = async (req: AuthRequest, res: Response): Promise<v
       input,
       expectedOutput,
       timeout: timeout || 30000,
-      createdBy: req.user.userId
+      createdBy: req.user.userId,
     });
 
     await testCase.save();
 
     res.status(201).json({
       success: true,
-      data: testCase
+      data: testCase,
     });
   } catch (error) {
     logger.error('Create test case error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to create test case'
+      error: 'Failed to create test case',
     });
   }
 };
@@ -70,7 +70,7 @@ export const getTestCases = async (req: AuthRequest, res: Response): Promise<voi
     if (!skill) {
       res.status(404).json({
         success: false,
-        error: 'Skill not found'
+        error: 'Skill not found',
       });
       return;
     }
@@ -82,7 +82,7 @@ export const getTestCases = async (req: AuthRequest, res: Response): Promise<voi
     if (!hasAccess) {
       res.status(403).json({
         success: false,
-        error: 'Access denied'
+        error: 'Access denied',
       });
       return;
     }
@@ -91,13 +91,13 @@ export const getTestCases = async (req: AuthRequest, res: Response): Promise<voi
 
     res.json({
       success: true,
-      data: testCases
+      data: testCases,
     });
   } catch (error) {
     logger.error('Get test cases error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch test cases'
+      error: 'Failed to fetch test cases',
     });
   }
 };
@@ -110,7 +110,7 @@ export const updateTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (!req.user?.userId) {
       res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
       return;
     }
@@ -119,7 +119,7 @@ export const updateTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (!testCase) {
       res.status(404).json({
         success: false,
-        error: 'Test case not found'
+        error: 'Test case not found',
       });
       return;
     }
@@ -127,7 +127,7 @@ export const updateTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (String(testCase.skillId) !== skillId) {
       res.status(400).json({
         success: false,
-        error: 'Test case does not belong to this skill'
+        error: 'Test case does not belong to this skill',
       });
       return;
     }
@@ -135,7 +135,7 @@ export const updateTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (String(testCase.createdBy) !== req.user.userId) {
       res.status(403).json({
         success: false,
-        error: 'Not authorized to update test case'
+        error: 'Not authorized to update test case',
       });
       return;
     }
@@ -145,13 +145,13 @@ export const updateTestCase = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({
       success: true,
-      data: testCase
+      data: testCase,
     });
   } catch (error) {
     logger.error('Update test case error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to update test case'
+      error: 'Failed to update test case',
     });
   }
 };
@@ -163,7 +163,7 @@ export const deleteTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (!req.user?.userId) {
       res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
       return;
     }
@@ -172,7 +172,7 @@ export const deleteTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (!testCase) {
       res.status(404).json({
         success: false,
-        error: 'Test case not found'
+        error: 'Test case not found',
       });
       return;
     }
@@ -180,7 +180,7 @@ export const deleteTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (String(testCase.skillId) !== skillId) {
       res.status(400).json({
         success: false,
-        error: 'Test case does not belong to this skill'
+        error: 'Test case does not belong to this skill',
       });
       return;
     }
@@ -188,7 +188,7 @@ export const deleteTestCase = async (req: AuthRequest, res: Response): Promise<v
     if (String(testCase.createdBy) !== req.user.userId) {
       res.status(403).json({
         success: false,
-        error: 'Not authorized to delete test case'
+        error: 'Not authorized to delete test case',
       });
       return;
     }
@@ -197,13 +197,13 @@ export const deleteTestCase = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({
       success: true,
-      message: 'Test case deleted'
+      message: 'Test case deleted',
     });
   } catch (error) {
     logger.error('Delete test case error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to delete test case'
+      error: 'Failed to delete test case',
     });
   }
 };
@@ -215,7 +215,7 @@ export const executeTest = async (req: AuthRequest, res: Response): Promise<void
     if (!req.user?.userId) {
       res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
       return;
     }
@@ -224,29 +224,27 @@ export const executeTest = async (req: AuthRequest, res: Response): Promise<void
     if (!skill) {
       res.status(404).json({
         success: false,
-        error: 'Skill not found'
+        error: 'Skill not found',
       });
       return;
     }
 
-    const hasAccess =
-      skill.visibility === 'public' ||
-      String(skill.owner) === req.user.userId;
+    const hasAccess = skill.visibility === 'public' || String(skill.owner) === req.user.userId;
 
     if (!hasAccess) {
       res.status(403).json({
         success: false,
-        error: 'Access denied'
+        error: 'Access denied',
       });
       return;
     }
 
-    const testCases = await TestCase.find({ skillId });
+    await TestCase.find({ skillId });
 
     const testResult = new TestResult({
       skillId,
       version: skill.version,
-      createdBy: req.user.userId
+      createdBy: req.user.userId,
     });
 
     await testResult.save();
@@ -254,13 +252,13 @@ export const executeTest = async (req: AuthRequest, res: Response): Promise<void
     res.status(202).json({
       success: true,
       data: testResult,
-      message: 'Test execution started'
+      message: 'Test execution started',
     });
   } catch (error) {
     logger.error('Execute test error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to execute test'
+      error: 'Failed to execute test',
     });
   }
 };
@@ -273,7 +271,7 @@ export const getTestResult = async (req: AuthRequest, res: Response): Promise<vo
     if (!testResult) {
       res.status(404).json({
         success: false,
-        error: 'Test result not found'
+        error: 'Test result not found',
       });
       return;
     }
@@ -281,7 +279,7 @@ export const getTestResult = async (req: AuthRequest, res: Response): Promise<vo
     if (String(testResult.skillId) !== skillId) {
       res.status(400).json({
         success: false,
-        error: 'Test result does not belong to this skill'
+        error: 'Test result does not belong to this skill',
       });
       return;
     }
@@ -294,20 +292,20 @@ export const getTestResult = async (req: AuthRequest, res: Response): Promise<vo
     if (!hasAccess) {
       res.status(403).json({
         success: false,
-        error: 'Access denied'
+        error: 'Access denied',
       });
       return;
     }
 
     res.json({
       success: true,
-      data: testResult
+      data: testResult,
     });
   } catch (error) {
     logger.error('Get test result error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch test result'
+      error: 'Failed to fetch test result',
     });
   }
 };
@@ -320,7 +318,7 @@ export const getTestLogs = async (req: AuthRequest, res: Response): Promise<void
     if (!testResult) {
       res.status(404).json({
         success: false,
-        error: 'Test result not found'
+        error: 'Test result not found',
       });
       return;
     }
@@ -328,7 +326,7 @@ export const getTestLogs = async (req: AuthRequest, res: Response): Promise<void
     if (String(testResult.skillId) !== skillId) {
       res.status(400).json({
         success: false,
-        error: 'Test result does not belong to this skill'
+        error: 'Test result does not belong to this skill',
       });
       return;
     }
@@ -341,20 +339,20 @@ export const getTestLogs = async (req: AuthRequest, res: Response): Promise<void
     if (!hasAccess) {
       res.status(403).json({
         success: false,
-        error: 'Access denied'
+        error: 'Access denied',
       });
       return;
     }
 
     res.json({
       success: true,
-      data: testResult.logs
+      data: testResult.logs,
     });
   } catch (error) {
     logger.error('Get test logs error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch test logs'
+      error: 'Failed to fetch test logs',
     });
   }
 };

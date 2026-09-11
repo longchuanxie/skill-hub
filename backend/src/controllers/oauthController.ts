@@ -9,8 +9,15 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('oauthController');
 
-const getProviderConfig = (provider: string): { authorizationURL: string; tokenURL: string; userInfoURL: string; scope: string } | undefined => {
-  const configs: Record<string, { authorizationURL: string; tokenURL: string; userInfoURL: string; scope: string }> = {
+const getProviderConfig = (
+  provider: string,
+):
+  | { authorizationURL: string; tokenURL: string; userInfoURL: string; scope: string }
+  | undefined => {
+  const configs: Record<
+    string,
+    { authorizationURL: string; tokenURL: string; userInfoURL: string; scope: string }
+  > = {
     google: {
       authorizationURL: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenURL: 'https://oauth2.googleapis.com/token',
@@ -41,22 +48,19 @@ const getNestedValue = (obj: any, path: string | undefined): string | undefined 
 export const getAuthUrl = async (req: Request, res: Response): Promise<void> => {
   try {
     const { provider: providerName } = req.params;
-    const provider = Array.isArray(providerName) ? providerName[0] : (providerName || '');
+    const provider = Array.isArray(providerName) ? providerName[0] : providerName || '';
     const { enterpriseId } = req.query;
 
     const oauthProvider = await OAuthProvider.findOne({
       provider: provider,
-      $or: [
-        { enterpriseId: null },
-        { enterpriseId }
-      ],
-      isEnabled: true
+      $or: [{ enterpriseId: null }, { enterpriseId }],
+      isEnabled: true,
     });
 
     if (!oauthProvider) {
       res.status(404).json({
         success: false,
-        error: 'OAuth provider not found or not enabled'
+        error: 'OAuth provider not found or not enabled',
       });
       return;
     }
@@ -67,21 +71,23 @@ export const getAuthUrl = async (req: Request, res: Response): Promise<void> => 
     if (!config && !isCustom) {
       res.status(400).json({
         success: false,
-        error: 'Invalid OAuth provider'
+        error: 'Invalid OAuth provider',
       });
       return;
     }
 
     const callbackBaseUrl = process.env.OAUTH_CALLBACK_BASE_URL || 'http://localhost:3002';
-    const callbackURL = isCustom 
+    const callbackURL = isCustom
       ? `${callbackBaseUrl}${oauthProvider.callbackPath}`
       : `${callbackBaseUrl}/api/oauth/callback/${provider}`;
 
-    const state = Buffer.from(JSON.stringify({
-      providerId: oauthProvider._id,
-      redirectUri: callbackURL,
-      enterpriseId: oauthProvider.enterpriseId
-    })).toString('base64');
+    const state = Buffer.from(
+      JSON.stringify({
+        providerId: oauthProvider._id,
+        redirectUri: callbackURL,
+        enterpriseId: oauthProvider.enterpriseId,
+      }),
+    ).toString('base64');
 
     if (isCustom) {
       const authUrl = new URL(oauthProvider.authorizationURL);
@@ -94,8 +100,8 @@ export const getAuthUrl = async (req: Request, res: Response): Promise<void> => 
       res.json({
         success: true,
         data: {
-          authUrl: authUrl.toString()
-        }
+          authUrl: authUrl.toString(),
+        },
       });
       return;
     }
@@ -110,14 +116,14 @@ export const getAuthUrl = async (req: Request, res: Response): Promise<void> => 
     res.json({
       success: true,
       data: {
-        authUrl: authUrl.toString()
-      }
+        authUrl: authUrl.toString(),
+      },
     });
   } catch (error) {
     logger.error('获取授权URL时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to generate auth URL'
+      error: 'Failed to generate auth URL',
     });
   }
 };
@@ -125,44 +131,45 @@ export const getAuthUrl = async (req: Request, res: Response): Promise<void> => 
 export const handleCallback = async (req: Request, res: Response): Promise<void> => {
   try {
     const { provider: providerName } = req.params;
-    const provider = Array.isArray(providerName) ? providerName[0] : (providerName || '');
+    const provider = Array.isArray(providerName) ? providerName[0] : providerName || '';
     const { code, state } = req.query;
 
     if (!code || !state) {
       res.status(400).json({
         success: false,
-        error: 'Missing code or state'
+        error: 'Missing code or state',
       });
       return;
     }
 
     const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-    const { providerId, redirectUri, enterpriseId } = stateData;
+    const { providerId, redirectUri } = stateData;
 
     const oauthProvider = await OAuthProvider.findById(providerId);
     if (!oauthProvider) {
       res.status(404).json({
         success: false,
-        error: 'OAuth provider not found'
+        error: 'OAuth provider not found',
       });
       return;
     }
 
-    const effectiveProvider = oauthProvider.provider === 'custom' ? provider : oauthProvider.provider;
+    const effectiveProvider =
+      oauthProvider.provider === 'custom' ? provider : oauthProvider.provider;
     const config = getProviderConfig(effectiveProvider);
     const isCustom = oauthProvider.provider === 'custom';
 
     if (!config && !isCustom) {
       res.status(400).json({
         success: false,
-        error: 'Invalid OAuth provider'
+        error: 'Invalid OAuth provider',
       });
       return;
     }
-    
+
     const tokenResponse = await axios.post(
-      isCustom ? oauthProvider.tokenURL : config!.tokenURL, 
-      isCustom 
+      isCustom ? oauthProvider.tokenURL : config!.tokenURL,
+      isCustom
         ? new URLSearchParams({
             client_id: oauthProvider.clientId,
             client_secret: oauthProvider.clientSecret,
@@ -178,8 +185,8 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
             redirect_uri: redirectUri,
           }).toString(),
       {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      }
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      },
     );
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
@@ -190,7 +197,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
 
     if (isCustom && oauthProvider.userInfoConfig) {
       const userInfoConfig = oauthProvider.userInfoConfig;
-      
+
       const userInfoResponse = await axios({
         method: userInfoConfig.method,
         url: userInfoConfig.url,
@@ -201,12 +208,13 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
         data: userInfoConfig.body,
       });
 
-      providerUserId = getNestedValue(userInfoResponse.data, userInfoConfig.userIdPath) || String(Date.now());
+      providerUserId =
+        getNestedValue(userInfoResponse.data, userInfoConfig.userIdPath) || String(Date.now());
       email = getNestedValue(userInfoResponse.data, userInfoConfig.emailPath);
       name = getNestedValue(userInfoResponse.data, userInfoConfig.namePath);
     } else {
       const userInfoResponse = await axios.get(config!.userInfoURL, {
-        headers: { Authorization: `Bearer ${access_token}` }
+        headers: { Authorization: `Bearer ${access_token}` },
       });
 
       providerUserId = userInfoResponse.data.id || userInfoResponse.data.sub;
@@ -215,7 +223,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
     }
 
     let user = await User.findOne({ email });
-    
+
     if (!user) {
       user = new User({
         username: name || `user_${providerUserId}`,
@@ -233,7 +241,7 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
 
     let oauthSession = await OAuthSession.findOne({
       userId: user._id,
-      provider: provider
+      provider: provider,
     });
 
     if (oauthSession) {
@@ -256,12 +264,14 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
 
     const token = generateAccessToken(user as any);
 
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/oauth/callback?token=${token}`);
+    res.redirect(
+      `${process.env.FRONTEND_URL || 'http://localhost:5173'}/oauth/callback?token=${token}`,
+    );
   } catch (error) {
     logger.error('OAuth回调处理时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'OAuth callback failed'
+      error: 'OAuth callback failed',
     });
   }
 };
@@ -272,21 +282,18 @@ export const getProviders = async (req: Request, res: Response): Promise<void> =
 
     const providers = await OAuthProvider.find({
       isEnabled: true,
-      $or: [
-        { enterpriseId: null },
-        { enterpriseId }
-      ]
+      $or: [{ enterpriseId: null }, { enterpriseId }],
     }).select('-clientSecret');
 
     res.json({
       success: true,
-      data: providers
+      data: providers,
     });
   } catch (error) {
     logger.error('获取OAuth提供商列表时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch providers'
+      error: 'Failed to fetch providers',
     });
   }
 };
@@ -294,14 +301,14 @@ export const getProviders = async (req: Request, res: Response): Promise<void> =
 export const linkAccount = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { provider: providerName } = req.params;
-    const provider = Array.isArray(providerName) ? providerName[0] : (providerName || '');
+    const provider = Array.isArray(providerName) ? providerName[0] : providerName || '';
     const userId = req.user?.userId;
     const { enterpriseId } = req.query;
 
     if (!userId) {
       res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
       return;
     }
@@ -309,16 +316,13 @@ export const linkAccount = async (req: AuthRequest, res: Response): Promise<void
     const oauthProvider = await OAuthProvider.findOne({
       provider: provider,
       isEnabled: true,
-      $or: [
-        { enterpriseId: null },
-        { enterpriseId }
-      ]
+      $or: [{ enterpriseId: null }, { enterpriseId }],
     });
 
     if (!oauthProvider) {
       res.status(404).json({
         success: false,
-        error: 'OAuth provider not found'
+        error: 'OAuth provider not found',
       });
       return;
     }
@@ -329,23 +333,25 @@ export const linkAccount = async (req: AuthRequest, res: Response): Promise<void
     if (!config && !isCustom) {
       res.status(400).json({
         success: false,
-        error: 'Invalid OAuth provider'
+        error: 'Invalid OAuth provider',
       });
       return;
     }
 
     const callbackBaseUrl = process.env.OAUTH_CALLBACK_BASE_URL || 'http://localhost:3002';
-    const callbackURL = isCustom 
+    const callbackURL = isCustom
       ? `${callbackBaseUrl}${oauthProvider.callbackPath}`
       : `${callbackBaseUrl}/api/oauth/callback/${provider}`;
 
-    const state = Buffer.from(JSON.stringify({
-      providerId: oauthProvider._id,
-      redirectUri: callbackURL,
-      action: 'link',
-      userId,
-      enterpriseId: oauthProvider.enterpriseId
-    })).toString('base64');
+    const state = Buffer.from(
+      JSON.stringify({
+        providerId: oauthProvider._id,
+        redirectUri: callbackURL,
+        action: 'link',
+        userId,
+        enterpriseId: oauthProvider.enterpriseId,
+      }),
+    ).toString('base64');
 
     const authUrl = new URL(isCustom ? oauthProvider.authorizationURL : config!.authorizationURL);
     authUrl.searchParams.set('client_id', oauthProvider.clientId);
@@ -356,23 +362,32 @@ export const linkAccount = async (req: AuthRequest, res: Response): Promise<void
 
     res.json({
       success: true,
-      data: { authUrl: authUrl.toString() }
+      data: { authUrl: authUrl.toString() },
     });
   } catch (error) {
     logger.error('链接账户时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to link account'
+      error: 'Failed to link account',
     });
   }
 };
 
 export const createProvider = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { 
-      name, provider, clientId, clientSecret, 
-      authorizationURL, tokenURL, userInfoURL, scope,
-      callbackPath, isEnabled, enterpriseId, userInfoConfig 
+    const {
+      name,
+      provider,
+      clientId,
+      clientSecret,
+      authorizationURL,
+      tokenURL,
+      userInfoURL,
+      scope,
+      callbackPath,
+      isEnabled,
+      enterpriseId,
+      userInfoConfig,
     } = req.body;
 
     const existingProvider = await OAuthProvider.findOne({ provider, enterpriseId });
@@ -380,7 +395,7 @@ export const createProvider = async (req: AuthRequest, res: Response): Promise<v
       res.status(400).json({
         success: false,
         error: 'OAUTH_PROVIDER_EXISTS',
-        message: `OAuth provider '${provider}' is already configured for this enterprise`
+        message: `OAuth provider '${provider}' is already configured for this enterprise`,
       });
       return;
     }
@@ -397,19 +412,19 @@ export const createProvider = async (req: AuthRequest, res: Response): Promise<v
       callbackPath,
       isEnabled: isEnabled || false,
       enterpriseId,
-      userInfoConfig
+      userInfoConfig,
     });
 
     await oauthProvider.save();
     res.status(201).json({
       success: true,
-      data: oauthProvider
+      data: oauthProvider,
     });
   } catch (error) {
     logger.error('创建OAuth提供商时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to create OAuth provider'
+      error: 'Failed to create OAuth provider',
     });
   }
 };
@@ -423,13 +438,24 @@ export const updateProvider = async (req: AuthRequest, res: Response): Promise<v
     if (!oauthProvider) {
       res.status(404).json({
         success: false,
-        error: 'OAuth provider not found'
+        error: 'OAuth provider not found',
       });
       return;
     }
 
-    const allowedUpdates = ['name', 'clientId', 'clientSecret', 'authorizationURL', 'tokenURL', 'userInfoURL', 'scope', 'callbackPath', 'isEnabled', 'userInfoConfig'];
-    allowedUpdates.forEach(field => {
+    const allowedUpdates = [
+      'name',
+      'clientId',
+      'clientSecret',
+      'authorizationURL',
+      'tokenURL',
+      'userInfoURL',
+      'scope',
+      'callbackPath',
+      'isEnabled',
+      'userInfoConfig',
+    ];
+    allowedUpdates.forEach((field) => {
       if (updates[field] !== undefined) {
         (oauthProvider as any)[field] = updates[field];
       }
@@ -438,13 +464,13 @@ export const updateProvider = async (req: AuthRequest, res: Response): Promise<v
     await oauthProvider.save();
     res.json({
       success: true,
-      data: oauthProvider
+      data: oauthProvider,
     });
   } catch (error) {
     logger.error('更新OAuth提供商时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to update OAuth provider'
+      error: 'Failed to update OAuth provider',
     });
   }
 };
@@ -457,7 +483,7 @@ export const deleteProvider = async (req: AuthRequest, res: Response): Promise<v
     if (!oauthProvider) {
       res.status(404).json({
         success: false,
-        error: 'OAuth provider not found'
+        error: 'OAuth provider not found',
       });
       return;
     }
@@ -465,13 +491,13 @@ export const deleteProvider = async (req: AuthRequest, res: Response): Promise<v
     await OAuthProvider.findByIdAndDelete(id);
     res.json({
       success: true,
-      message: 'OAuth provider deleted'
+      message: 'OAuth provider deleted',
     });
   } catch (error) {
     logger.error('删除OAuth提供商时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to delete OAuth provider'
+      error: 'Failed to delete OAuth provider',
     });
   }
 };
@@ -481,18 +507,18 @@ export const getEnterpriseProviders = async (req: AuthRequest, res: Response): P
     const { enterpriseId } = req.query;
 
     const providers = await OAuthProvider.find({
-      enterpriseId: enterpriseId || null
+      enterpriseId: enterpriseId || null,
     }).select('-clientSecret');
 
     res.json({
       success: true,
-      data: providers
+      data: providers,
     });
   } catch (error) {
     logger.error('获取企业OAuth提供商列表时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch enterprise providers'
+      error: 'Failed to fetch enterprise providers',
     });
   }
 };

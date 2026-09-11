@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { User, IUser } from '../models/User';
+import { User } from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { getFileUrl } from '../middleware/upload';
 import { createLogger } from '../utils/logger';
@@ -10,7 +10,7 @@ const logger = createLogger('UserController');
 export const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     logger.debug('Getting user profile', { userId: req.user?.userId });
-    
+
     const user = await User.findById(req.user?.userId).select('-password');
     if (!user) {
       logger.warn('Get profile failed - user not found', { userId: req.user?.userId });
@@ -20,7 +20,11 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
     }
     res.json(user);
   } catch (error) {
-    logger.error('Get profile failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    logger.error('Get profile failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.user?.userId,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -57,12 +61,19 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     await user.save();
-    
+
     logger.info('User profile updated successfully', { userId, username: user.username });
 
-    res.json({ message: 'Profile updated', user: { id: user._id, username: user.username, email: user.email, avatar: user.avatar } });
+    res.json({
+      message: 'Profile updated',
+      user: { id: user._id, username: user.username, email: user.email, avatar: user.avatar },
+    });
   } catch (error) {
-    logger.error('Update profile failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    logger.error('Update profile failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.user?.userId,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -71,9 +82,9 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
 export const getUserById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     logger.debug('Getting user by ID', { userId: id, requesterId: req.user?.userId });
-    
+
     const user = await User.findById(id).select('username avatar role createdAt');
     if (!user) {
       logger.warn('Get user failed - user not found', { userId: id });
@@ -83,7 +94,11 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
     }
     res.json(user);
   } catch (error) {
-    logger.error('Get user failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.params.id });
+    logger.error('Get user failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -98,7 +113,7 @@ export const getUserList = async (req: AuthRequest, res: Response): Promise<void
 
     const [users, total] = await Promise.all([
       User.find().select('-password').skip(skip).limit(Number(pageSize)).sort({ createdAt: -1 }),
-      User.countDocuments()
+      User.countDocuments(),
     ]);
 
     logger.info('User list retrieved successfully', { count: users.length, total, page, pageSize });
@@ -109,11 +124,14 @@ export const getUserList = async (req: AuthRequest, res: Response): Promise<void
         page: Number(page),
         pageSize: Number(pageSize),
         total,
-        pages: Math.ceil(total / Number(pageSize))
-      }
+        pages: Math.ceil(total / Number(pageSize)),
+      },
     });
   } catch (error) {
-    logger.error('Get user list failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+    logger.error('Get user list failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -135,23 +153,24 @@ export const searchUsers = async (req: AuthRequest, res: Response): Promise<void
     const query: any = {
       $or: [
         { username: { $regex: searchQuery, $options: 'i' } },
-        { email: { $regex: searchQuery, $options: 'i' } }
-      ]
+        { email: { $regex: searchQuery, $options: 'i' } },
+      ],
     };
 
     if (currentUser?.enterpriseId) {
       query.enterpriseId = currentUser.enterpriseId;
     }
 
-    const users = await User.find(query)
-      .select('_id username email avatar')
-      .limit(Number(limit));
+    const users = await User.find(query).select('_id username email avatar').limit(Number(limit));
 
     logger.info('User search completed', { count: users.length, searchQuery });
 
     res.json({ users });
   } catch (error) {
-    logger.error('Search users failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+    logger.error('Search users failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -175,13 +194,17 @@ export const uploadAvatar = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     user.avatar = getFileUrl(req.file.filename);
-    
+
     logger.info('Avatar uploaded successfully', { userId: user._id, filename: req.file.filename });
     await user.save();
 
     res.json({ message: 'Avatar uploaded', avatar: user.avatar });
   } catch (error) {
-    logger.error('Upload avatar failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    logger.error('Upload avatar failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.user?.userId,
+    });
     const err = createErrorResponse(ErrorCode.FILE_UPLOAD_ERROR);
     res.status(err.statusCode).json(err);
   }

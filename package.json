@@ -1,40 +1,25 @@
 {
   "name": "@xielc/skillhub",
   "version": "1.0.0",
+  "private": true,
   "description": "SkillHub AI Resource Platform - Enterprise-grade AI skills and prompts management platform",
-  "main": "backend/dist/app.js",
-  "files": [
-    "backend/dist/",
-    "frontend/dist/",
-    "backend/src/config/",
-    "backend/src/utils/",
-    "backend/src/middleware/auth.ts",
-    "backend/src/middleware/errorHandler.ts",
-    "backend/src/models/",
-    "backend/src/controllers/",
-    "backend/src/routes/",
-    "backend/src/services/",
-    "backend/src/types/",
-    "backend/src/validations/",
-    "backend/src/interfaces/",
-    "backend/src/app.ts",
-    "backend/src/app-memory.ts",
-    "backend/package.json",
-    "frontend/package.json",
-    "backend/.env.example",
-    "backend/uploads/.gitkeep"
-  ],
+  "main": "backend/dist/server.js",
   "scripts": {
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
-    "dev": "cd backend && npm run dev",
+    "dev": "concurrently -n backend,frontend -c blue,green \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
-    "build:all": "cd frontend && npm run build && cd ../backend && npm run build",
-    "postinstall": "npm run build:all",
-    "start": "cd backend && npm start",
+    "build:backend": "cd backend && npm run build",
+    "build:all": "npm run build && npm run build:backend",
+    "start": "cross-env NODE_ENV=production node backend/dist/server.js",
+    "lint": "cd backend && npm run lint && cd ../frontend && npm run lint",
     "test": "cd backend && npm test",
     "test:frontend": "cd frontend && npm run test",
-    "setup": "npm run install:all && npm run build"
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css,md}": "prettier --write"
   },
   "keywords": [
     "skillhub",
@@ -47,17 +32,24 @@
     "claude",
     "mcp"
   ],
-  "author": "",
+  "author": "longchuanxie",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xielc/skill-hub"
+    "url": "https://github.com/longchuanxie/skill-hub"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "bugs": {
-    "url": "https://github.com/xielc/skill-hub/issues"
+    "url": "https://github.com/longchuanxie/skill-hub/issues"
   },
-  "homepage": "https://github.com/xielc/skill-hub#readme"
+  "homepage": "https://github.com/longchuanxie/skill-hub#readme",
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
+    "prettier": "^3.4.2"
+  }
 }

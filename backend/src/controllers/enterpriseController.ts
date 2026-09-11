@@ -1,4 +1,4 @@
-import { Response, Request, Express } from 'express';
+import { Response, Request } from 'express';
 import { Enterprise } from '../models/Enterprise';
 import { User } from '../models/User';
 import { Invitation } from '../models/Invitation';
@@ -14,12 +14,14 @@ const logger = createLogger('EnterpriseController');
 export const createEnterprise = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name, description } = req.body;
-    
+
     logger.info('Creating enterprise', { userId: req.user?.userId, name });
 
     const existingEnterprise = await Enterprise.findOne({ owner: req.user?.userId });
     if (existingEnterprise) {
-      logger.warn('Create enterprise failed - user already owns an enterprise', { userId: req.user?.userId });
+      logger.warn('Create enterprise failed - user already owns an enterprise', {
+        userId: req.user?.userId,
+      });
       res.status(400).json(createErrorResponse(ErrorCode.OPERATION_NOT_ALLOWED));
       return;
     }
@@ -46,7 +48,11 @@ export const createEnterprise = async (req: AuthRequest, res: Response): Promise
       await user.save();
     }
 
-    logger.info('Enterprise created successfully', { enterpriseId: enterprise._id, userId: req.user?.userId, name });
+    logger.info('Enterprise created successfully', {
+      enterpriseId: enterprise._id,
+      userId: req.user?.userId,
+      name,
+    });
 
     res.status(201).json(enterprise);
   } catch (error: any) {
@@ -55,7 +61,11 @@ export const createEnterprise = async (req: AuthRequest, res: Response): Promise
       res.status(400).json(createErrorResponse(ErrorCode.DUPLICATE_RESOURCE));
       return;
     }
-    logger.error('Create enterprise failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    logger.error('Create enterprise failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.user?.userId,
+    });
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
@@ -63,33 +73,44 @@ export const createEnterprise = async (req: AuthRequest, res: Response): Promise
 export const getEnterprise = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     logger.debug('Getting enterprise by ID', { enterpriseId: id, userId: req.user?.userId });
-    
+
     const enterprise = await Enterprise.findById(id)
       .populate('owner', 'username email avatar')
       .populate('members.userId', 'username email avatar');
-    
+
     if (!enterprise) {
-      logger.warn('Get enterprise failed - enterprise not found', { enterpriseId: id, userId: req.user?.userId });
+      logger.warn('Get enterprise failed - enterprise not found', {
+        enterpriseId: id,
+        userId: req.user?.userId,
+      });
       res.status(404).json(createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND));
       return;
     }
 
     const isMember = enterprise.members.some(
-      m => (m.userId as any)._id?.toString() === req.user?.userId
+      (m) => (m.userId as any)._id?.toString() === req.user?.userId,
     );
     const isOwner = (enterprise.owner as any)._id?.toString() === req.user?.userId;
 
     if (!isMember && !isOwner && enterprise.subscription.plan === 'free') {
-      logger.warn('Get enterprise failed - access denied', { enterpriseId: id, userId: req.user?.userId, plan: enterprise.subscription.plan });
+      logger.warn('Get enterprise failed - access denied', {
+        enterpriseId: id,
+        userId: req.user?.userId,
+        plan: enterprise.subscription.plan,
+      });
       res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
       return;
     }
 
     res.json(enterprise);
   } catch (error) {
-    logger.error('Get enterprise failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, enterpriseId: req.params.id });
+    logger.error('Get enterprise failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      enterpriseId: req.params.id,
+    });
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
@@ -123,7 +144,7 @@ export const updateEnterprise = async (req: AuthRequest, res: Response): Promise
     }
 
     const isAdmin = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId && m.role === 'admin'
+      (m) => m.userId.toString() === req.user?.userId && m.role === 'admin',
     );
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
@@ -156,7 +177,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     const isAdmin = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId && m.role === 'admin'
+      (m) => m.userId.toString() === req.user?.userId && m.role === 'admin',
     );
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
@@ -174,7 +195,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
     const existingInvitation = await Invitation.findOne({
       email,
       enterpriseId: id,
-      status: 'pending'
+      status: 'pending',
     });
     if (existingInvitation) {
       res.status(400).json(createErrorResponse(ErrorCode.INVITATION_PENDING_EXISTS));
@@ -188,7 +209,7 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
       invitedBy: req.user?.userId,
       role: role as 'admin' | 'member',
       token,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
     await invitation.save();
@@ -198,14 +219,16 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
       actor: req.user?.userId,
       targetType: 'enterprise',
       targetId: id,
-      details: { email, role }
+      details: { email, role },
     });
 
     logger.info('Invitation created', { invitationId: invitation._id, email, enterpriseId: id });
 
     res.status(201).json(invitation);
   } catch (error) {
-    logger.error('Failed to invite member', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to invite member', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
@@ -221,7 +244,7 @@ export const getInvitations = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const isAdmin = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId && m.role === 'admin'
+      (m) => m.userId.toString() === req.user?.userId && m.role === 'admin',
     );
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
@@ -236,7 +259,9 @@ export const getInvitations = async (req: AuthRequest, res: Response): Promise<v
 
     res.json(invitations);
   } catch (error) {
-    logger.error('Failed to get invitations', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to get invitations', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
@@ -289,7 +314,7 @@ export const acceptInvitation = async (req: AuthRequest, res: Response): Promise
     enterprise.members.push({
       userId: user._id as any,
       role: invitation.role,
-      joinedAt: new Date()
+      joinedAt: new Date(),
     });
     await enterprise.save();
 
@@ -298,14 +323,20 @@ export const acceptInvitation = async (req: AuthRequest, res: Response): Promise
       actor: user._id,
       targetType: 'enterprise',
       targetId: enterprise._id,
-      details: { invitationId: invitation._id }
+      details: { invitationId: invitation._id },
     });
 
-    logger.info('Invitation accepted', { invitationId: invitation._id, userId: user._id, enterpriseId: enterprise._id });
+    logger.info('Invitation accepted', {
+      invitationId: invitation._id,
+      userId: user._id,
+      enterpriseId: enterprise._id,
+    });
 
     res.json({ message: 'Invitation accepted successfully', enterprise });
   } catch (error) {
-    logger.error('Failed to accept invitation', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to accept invitation', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
@@ -344,14 +375,16 @@ export const declineInvitation = async (req: AuthRequest, res: Response): Promis
       actor: user._id,
       targetType: 'enterprise',
       targetId: invitation.enterpriseId,
-      details: { invitationId: invitation._id }
+      details: { invitationId: invitation._id },
     });
 
     logger.info('Invitation declined', { invitationId: invitation._id, userId: user._id });
 
     res.json({ message: 'Invitation declined successfully' });
   } catch (error) {
-    logger.error('Failed to decline invitation', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to decline invitation', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
@@ -367,7 +400,7 @@ export const cancelInvitation = async (req: AuthRequest, res: Response): Promise
     }
 
     const isAdmin = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId && m.role === 'admin'
+      (m) => m.userId.toString() === req.user?.userId && m.role === 'admin',
     );
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
@@ -394,14 +427,16 @@ export const cancelInvitation = async (req: AuthRequest, res: Response): Promise
       actor: req.user?.userId,
       targetType: 'enterprise',
       targetId: id,
-      details: { invitationId, email: invitation.email }
+      details: { invitationId, email: invitation.email },
     });
 
     logger.info('Invitation cancelled', { invitationId, enterpriseId: id });
 
     res.json({ message: 'Invitation cancelled successfully' });
   } catch (error) {
-    logger.error('Failed to cancel invitation', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to cancel invitation', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };
@@ -417,7 +452,7 @@ export const removeMember = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     const isAdmin = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId && m.role === 'admin'
+      (m) => m.userId.toString() === req.user?.userId && m.role === 'admin',
     );
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
@@ -426,9 +461,7 @@ export const removeMember = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    enterprise.members = enterprise.members.filter(
-      m => m.userId.toString() !== memberId
-    );
+    enterprise.members = enterprise.members.filter((m) => m.userId.toString() !== memberId);
     await enterprise.save();
 
     res.json({ message: 'Member removed' });
@@ -454,9 +487,7 @@ export const updateMemberRole = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const member = enterprise.members.find(
-      m => m.userId.toString() === memberId
-    );
+    const member = enterprise.members.find((m) => m.userId.toString() === memberId);
     if (!member) {
       res.status(404).json(createErrorResponse(ErrorCode.USER_NOT_FOUND));
       return;
@@ -496,9 +527,7 @@ export const leaveEnterprise = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    enterprise.members = enterprise.members.filter(
-      m => m.userId.toString() !== userId
-    );
+    enterprise.members = enterprise.members.filter((m) => m.userId.toString() !== userId);
     await enterprise.save();
 
     user.enterpriseId = undefined;
@@ -523,7 +552,7 @@ export const updateAuthSettings = async (req: AuthRequest, res: Response): Promi
     }
 
     const isAdmin = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId && m.role === 'admin'
+      (m) => m.userId.toString() === req.user?.userId && m.role === 'admin',
     );
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
@@ -540,9 +569,9 @@ export const updateAuthSettings = async (req: AuthRequest, res: Response): Promi
     }
 
     await enterprise.save();
-    res.json({ 
+    res.json({
       message: 'Auth settings updated',
-      settings: enterprise.settings.auth 
+      settings: enterprise.settings.auth,
     });
   } catch (error) {
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
@@ -559,9 +588,7 @@ export const getAuthSettings = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const isMember = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId
-    );
+    const isMember = enterprise.members.some((m) => m.userId.toString() === req.user?.userId);
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isMember && !isOwner) {
@@ -587,7 +614,7 @@ export const getAuthSettingsPublic = async (req: Request, res: Response): Promis
 
     res.json({
       passwordLoginEnabled: enterprise.settings.auth.passwordLoginEnabled,
-      oauthRequired: enterprise.settings.auth.oauthRequired
+      oauthRequired: enterprise.settings.auth.oauthRequired,
     });
   } catch (error) {
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
@@ -604,9 +631,7 @@ export const getResourceReviewSettings = async (req: AuthRequest, res: Response)
       return;
     }
 
-    const isMember = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId
-    );
+    const isMember = enterprise.members.some((m) => m.userId.toString() === req.user?.userId);
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
     if (!isMember && !isOwner) {
@@ -620,7 +645,10 @@ export const getResourceReviewSettings = async (req: AuthRequest, res: Response)
   }
 };
 
-export const updateResourceReviewSettings = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateResourceReviewSettings = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const { autoApprove, enableContentFilter } = req.body;
@@ -632,7 +660,7 @@ export const updateResourceReviewSettings = async (req: AuthRequest, res: Respon
     }
 
     const isAdmin = enterprise.members.some(
-      m => m.userId.toString() === req.user?.userId && m.role === 'admin'
+      (m) => m.userId.toString() === req.user?.userId && m.role === 'admin',
     );
     const isOwner = enterprise.owner.toString() === req.user?.userId;
 
@@ -649,9 +677,9 @@ export const updateResourceReviewSettings = async (req: AuthRequest, res: Respon
     }
 
     await enterprise.save();
-    res.json({ 
+    res.json({
       message: 'Resource review settings updated',
-      settings: enterprise.settings.resourceReview 
+      settings: enterprise.settings.resourceReview,
     });
   } catch (error) {
     res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));

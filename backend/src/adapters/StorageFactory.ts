@@ -1,5 +1,5 @@
 import { StorageAdapter } from '../interfaces/storage.interface';
-import { LocalStorageAdapter, localStorageAdapter } from './LocalStorageAdapter';
+import { localStorageAdapter } from './LocalStorageAdapter';
 import { getLocalPath } from '../config/storage';
 import { createLogger } from '../utils/logger';
 

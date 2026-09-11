@@ -1,4 +1,5 @@
 import multer from 'multer';
+import crypto from 'crypto';
 import path from 'path';
 import { Request } from 'express';
 import { createLogger } from '../utils/logger';
@@ -12,7 +13,6 @@ const storage = multer.diskStorage({
     cb(null, path.resolve(getLocalPath()));
   },
   filename: (req, file, cb) => {
-    const crypto = require('crypto');
     const uniqueSuffix = crypto.randomBytes(16).toString('hex');
     const ext = path.extname(file.originalname);
     cb(null, `${uniqueSuffix}${ext}`);
@@ -22,9 +22,23 @@ const storage = multer.diskStorage({
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedTypes = [
     '.zip',
-    '.js', '.ts', '.py', '.json', '.md', '.txt',
-    '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+    '.js',
+    '.ts',
+    '.py',
+    '.json',
+    '.md',
+    '.txt',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.svg',
+    '.webp',
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
   ];
 
   const ext = path.extname(file.originalname).toLowerCase();
@@ -36,7 +50,7 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
       filename: file.originalname,
       mimetype: file.mimetype,
       ext,
-      ip: req.ip
+      ip: req.ip,
     });
     cb(new Error(`File type ${ext} not allowed`));
   }
