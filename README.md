@@ -352,6 +352,11 @@ SkillHub supports multiple languages:
 
 Language files are located in `frontend/src/i18n/locales/`.
 
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[coding standards guide](docs/guides/coding-standards-guide.md).
+
 ### License
 
 MIT License
@@ -677,6 +682,10 @@ SkillHub 支持多语言：
 - 中文
 
 语言文件位于 `frontend/src/i18n/locales/`。
+
+### 参与贡献
+
+见 [CONTRIBUTING.md](CONTRIBUTING.md) 与[代码编写规范](docs/guides/coding-standards-guide.md)。
 
 ### 许可证
 

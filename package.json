@@ -46,6 +46,8 @@
   },
   "homepage": "https://github.com/longchuanxie/skill-hub#readme",
   "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
     "husky": "^9.1.7",
