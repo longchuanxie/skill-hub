@@ -1,0 +1,9 @@
+{
+  "name": "test-skill-1",
+  "version": "1.0.0",
+  "description": "A test skill for integration testing. This skill demonstrates basic functionality for testing the skill upload and version management system.",
+  "author": "test-user",
+  "license": "MIT",
+  "keywords": ["test", "integration", "demo"],
+  "category": "coding"
+}

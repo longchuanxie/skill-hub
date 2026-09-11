@@ -1,0 +1,6 @@
+{
+  "name": "Test Prompt 1",
+  "description": "A test prompt for integration testing. This prompt helps test the prompt creation and version management system.",
+  "category": "general",
+  "tags": ["test", "integration"]
+}
