@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 interface TestCaseListProps {
   skillId: string;
+  onAddTestCase?: () => void;
   onEditTestCase?: (testCase: TestCase) => void;
   onDeleteTestCase?: (testCaseId: string) => void;
   onRunTest?: () => void;
@@ -14,6 +15,7 @@ interface TestCaseListProps {
 
 const TestCaseList: React.FC<TestCaseListProps> = ({
   skillId,
+  onAddTestCase,
   onEditTestCase,
   onDeleteTestCase,
   onRunTest
@@ -57,6 +59,12 @@ const TestCaseList: React.FC<TestCaseListProps> = ({
         <CardContent className="p-6">
           <div className="text-center text-gray-500">
             <p>{t('test.noTestCases')}</p>
+            {onAddTestCase && (
+              <Button onClick={onAddTestCase} className="mt-4 flex items-center gap-2 mx-auto">
+                <Plus className="w-4 h-4" />
+                {t('test.addTestCase')}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -67,12 +75,20 @@ const TestCaseList: React.FC<TestCaseListProps> = ({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t('test.testCases')}</CardTitle>
-        {onRunTest && (
-          <Button onClick={onRunTest} className="flex items-center gap-2">
-            <Play className="w-4 h-4" />
-            {t('test.runAll')}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {onAddTestCase && (
+            <Button onClick={onAddTestCase} variant="outline" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              {t('test.addTestCase')}
+            </Button>
+          )}
+          {onRunTest && (
+            <Button onClick={onRunTest} className="flex items-center gap-2">
+              <Play className="w-4 h-4" />
+              {t('test.runAll')}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">

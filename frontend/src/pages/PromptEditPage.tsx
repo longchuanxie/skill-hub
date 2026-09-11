@@ -85,22 +85,15 @@ const PromptEditPage: React.FC = () => {
     setSuccess('');
 
     try {
-      await fetch(`/api/prompts/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${useAuthStore.getState().token}`,
-        },
-        body: JSON.stringify({
-          name: form.name,
-          description: form.description,
-          content: form.content,
-          category: form.category,
-          tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
-          visibility: form.visibility,
-          status: form.status,
-          updateDescription: form.updateDescription,
-        }),
+      await promptApi.updatePrompt(id, {
+        name: form.name,
+        description: form.description,
+        content: form.content,
+        category: form.category,
+        tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+        visibility: form.visibility,
+        status: form.status,
+        updateDescription: form.updateDescription,
       });
       setSuccess(t('edit.success'));
       setTimeout(() => navigate(`/prompts/${id}`), 1500);

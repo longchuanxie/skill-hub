@@ -22,10 +22,10 @@ const CreateAgentPage = () => {
     setLoading(true);
 
     try {
-      const agent = await agentApi.createAgent(formData);
+      const response = await agentApi.createAgent(formData);
       setCreatedAgent({
-        name: agent.name,
-        apiKey: agent.apiKey
+        name: formData.name || response.agent.description || 'Agent',
+        apiKey: response.apiKey
       });
     } catch (error) {
       console.error('Failed to create agent:', error);

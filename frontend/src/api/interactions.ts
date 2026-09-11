@@ -1,6 +1,6 @@
-import { createApiClient } from './client';
+import { apiClient } from './client';
 
-const client = createApiClient();
+const client = apiClient;
 
 export const favoriteApi = {
   add: async (type: 'skill' | 'prompt', id: string) => {

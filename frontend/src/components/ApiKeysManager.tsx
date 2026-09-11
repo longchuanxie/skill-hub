@@ -91,7 +91,7 @@ const ApiKeysManager = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await agentApi.regenerateApiKey(id);
+      await agentApi.regenerateApiKey(id);
       setSuccess(t('settings.apiKeyRegenerated'));
       setVisibleKeys(prev => new Set(prev).add(id));
       await loadAgents();

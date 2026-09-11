@@ -30,7 +30,7 @@ const AgentDetailPage = () => {
         const data = await agentApi.getAgent(id);
         setAgent(data);
         setFormData({
-          name: data.name,
+          name: data.name || '',
           description: data.description,
           endpoint: data.endpoint || '',
           rateLimit: data.rateLimit || 100,
@@ -69,7 +69,7 @@ const AgentDetailPage = () => {
 
     try {
       const newKey = await agentApi.regenerateApiKey(id);
-      setApiKey(newKey);
+      setApiKey(newKey.apiKey);
       setShowApiKey(true);
     } catch (error) {
       console.error('Failed to regenerate API key:', error);

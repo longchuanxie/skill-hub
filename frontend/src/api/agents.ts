@@ -1,11 +1,12 @@
 import { apiClient } from './client';
-import { ApiResponse } from '../types/api';
 
 export interface Agent {
   _id: string;
+  name?: string;
   description: string;
   apiKey?: string;
   endpoint?: string;
+  rateLimit?: number;
   isEnabled: boolean;
   createdBy: string;
   owner?: string;
@@ -24,13 +25,20 @@ export interface Agent {
 }
 
 export interface CreateAgentRequest {
+  name?: string;
   description?: string;
+  endpoint?: string;
+  rateLimit?: number;
   permissions?: {
     canRead: boolean;
     canWrite: boolean;
     allowedResources: string[];
   };
   enterpriseId?: string;
+}
+
+export interface UpdateAgentRequest extends CreateAgentRequest {
+  isEnabled?: boolean;
 }
 
 export interface AgentsResponse {
@@ -49,8 +57,18 @@ export const agentApi = {
     return response.data;
   },
 
+  getAgent: async (id: string): Promise<Agent> => {
+    const response = await apiClient.get(`/agents/${id}`);
+    return response.data;
+  },
+
   createAgent: async (data: CreateAgentRequest): Promise<{ agent: Agent; apiKey: string }> => {
     const response = await apiClient.post('/agents', data);
+    return response.data;
+  },
+
+  updateAgent: async (id: string, data: UpdateAgentRequest): Promise<Agent> => {
+    const response = await apiClient.put(`/agents/${id}`, data);
     return response.data;
   },
 

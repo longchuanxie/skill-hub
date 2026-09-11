@@ -14,6 +14,8 @@ import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued'
 interface VersionManagementProps {
   resourceId: string
   resourceType: 'skill' | 'prompt'
+  currentVersion?: string
+  onRollback?: (version: string) => Promise<void>
 }
 
 const VersionManagement: React.FC<VersionManagementProps> = ({

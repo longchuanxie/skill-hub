@@ -18,7 +18,7 @@ interface TestCaseEditorProps {
 }
 
 const TestCaseEditor: React.FC<TestCaseEditorProps> = ({
-  skillId,
+
   testCase,
   onSave,
   onCancel,

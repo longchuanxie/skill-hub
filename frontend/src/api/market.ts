@@ -1,6 +1,6 @@
-import { createApiClient } from './client';
+import { apiClient } from './client';
 
-const marketClient = createApiClient();
+const marketClient = apiClient;
 
 export interface Skill {
   _id: string;
@@ -347,6 +347,20 @@ export const promptApi = {
     updateDescription?: string;
   }): Promise<Prompt> => {
     const response = await marketClient.post<Prompt>('/prompts', data);
+    return response.data;
+  },
+
+  updatePrompt: async (id: string, data: {
+    name: string;
+    description: string;
+    category: string;
+    visibility: string;
+    status: string;
+    content: string;
+    tags: string[];
+    updateDescription?: string;
+  }): Promise<Prompt> => {
+    const response = await marketClient.put<Prompt>(`/prompts/${id}`, data);
     return response.data;
   },
 

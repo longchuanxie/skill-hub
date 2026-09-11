@@ -17,7 +17,7 @@ export interface Collaborator {
 export interface SkillPermissions {
   _id: string;
   skillId: string;
-  visibility: 'public' | 'private' | 'password-protected' | 'team';
+  visibility: 'public' | 'private' | 'enterprise' | 'shared';
   password?: string;
   allowComments: boolean;
   allowForks: boolean;

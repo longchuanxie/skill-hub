@@ -24,11 +24,18 @@ const PromptsMarketPage: React.FC = () => {
   
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sort, setSort] = useState('latest');
+
+  // Debounce the search box so typing does not fire a request per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     fetchPrompts();
-  }, [page, category, sort]);
+  }, [page, category, sort, debouncedSearch]);
 
   const fetchPrompts = async () => {
     setLoading(true);
@@ -36,8 +43,8 @@ const PromptsMarketPage: React.FC = () => {
     try {
       const params: Record<string, unknown> = { page, pageSize, sort };
       if (category && category !== 'all') params.category = category;
-      if (search) params.search = search;
-      
+      if (debouncedSearch) params.search = debouncedSearch;
+
       const data: PromptsResponse = await promptApi.getPrompts(params);
       setPrompts(data.prompts);
       setTotal(data.pagination.total);
@@ -52,8 +59,8 @@ const PromptsMarketPage: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setDebouncedSearch(search);
     setPage(1);
-    fetchPrompts();
   };
 
   const handlePageChange = (newPage: number) => {

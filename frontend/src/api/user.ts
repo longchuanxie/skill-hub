@@ -1,7 +1,7 @@
-import { createApiClient } from './client';
+import { apiClient } from './client';
 import { User } from '../stores/authStore';
 
-const userClient = createApiClient();
+const userClient = apiClient;
 
 export const userApi = {
   getProfile: async (): Promise<User> => {

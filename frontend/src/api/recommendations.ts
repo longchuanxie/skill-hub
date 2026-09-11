@@ -1,6 +1,6 @@
-import { createApiClient } from './client';
+import { apiClient } from './client';
 
-const recommendationClient = createApiClient();
+const recommendationClient = apiClient;
 
 export interface ResourceItem {
   _id: string;

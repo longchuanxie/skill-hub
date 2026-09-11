@@ -4,20 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { onlineTestApi, TestCase, TestResult } from '../api/onlineTest';
-import { toast } from 'sonner';
+import { TestCase, TestCaseResult, TestLog } from '../api/onlineTest';
+
+type TestCaseRunResult = TestCaseResult & { logs?: TestLog[] };
 
 interface TestRunnerProps {
   skillId: string;
   testCases: TestCase[];
-  onTestComplete?: (results: TestResult[]) => void;
+  onTestComplete?: (results: TestCaseRunResult[]) => void;
 }
 
-const TestRunner: React.FC<TestRunnerProps> = ({ skillId, testCases, onTestComplete }) => {
+const TestRunner: React.FC<TestRunnerProps> = ({ testCases }) => {
   const { t } = useTranslation();
-  const [isRunning, setIsRunning] = useState(false);
-  const [results, setResults] = useState<TestResult[]>([]);
-  const [currentTestCaseIndex, setCurrentTestCaseIndex] = useState<number>(-1);
+  const [isRunning] = useState(false);
+  const [results] = useState<TestCaseRunResult[]>([]);
+  const [currentTestCaseIndex] = useState<number>(-1);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

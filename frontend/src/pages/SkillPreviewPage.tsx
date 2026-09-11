@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Layout from '../components/Layout';
 import { skillApi } from '../api/market';
-import { useAuthStore } from '../stores/authStore';
 
 const FILE_TYPE_GROUPS: Record<string, string[]> = {
   'script': ['js', 'ts', 'jsx', 'tsx', 'mjs'],
@@ -52,7 +51,7 @@ const SkillPreviewPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  
   const [fileTree, setFileTree] = useState<FileTreeNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string>('');

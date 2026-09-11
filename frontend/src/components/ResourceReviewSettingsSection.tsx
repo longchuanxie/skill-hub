@@ -44,7 +44,6 @@ const ResourceReviewSettingsSection: React.FC<ResourceReviewSettingsSectionProps
   const handleToggle = async (key: keyof ResourceReviewSettings, value: boolean) => {
     if (!isAdmin) return;
 
-    const newSettings = { ...settings, [key]: value };
 
     setSaving(true);
     setError('');

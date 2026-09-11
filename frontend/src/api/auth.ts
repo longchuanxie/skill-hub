@@ -1,7 +1,7 @@
-import { createApiClient } from './client';
+import { apiClient } from './client';
 import { useAuthStore, User } from '../stores/authStore';
 
-const authClient = createApiClient();
+const authClient = apiClient;
 
 export interface LoginRequest {
   email: string;

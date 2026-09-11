@@ -53,7 +53,7 @@ const SkillOnlineTestPage: React.FC = () => {
     if (!window.confirm(t('onlineTest.deleteConfirm'))) return;
     
     try {
-      await onlineTestApi.deleteTestCase(testCaseId);
+      await onlineTestApi.deleteTestCase(id!, testCaseId);
       await loadTestCases();
     } catch (error) {
       console.error('Failed to delete test case:', error);
@@ -112,8 +112,8 @@ const SkillOnlineTestPage: React.FC = () => {
             <CardContent>
               <TestCaseEditor
                 skillId={id!}
-                testCase={editingTestCase}
-                onSaved={handleTestCaseSaved}
+                testCase={editingTestCase ?? undefined}
+                onSave={handleTestCaseSaved}
                 onCancel={() => {
                   setShowEditor(false);
                   setEditingTestCase(null);
@@ -130,7 +130,7 @@ const SkillOnlineTestPage: React.FC = () => {
             
             <TabsContent value="testCases">
               <TestCaseList
-                testCases={testCases}
+                skillId={id!}
                 onAddTestCase={handleCreateTestCase}
                 onEditTestCase={handleEditTestCase}
                 onDeleteTestCase={handleDeleteTestCase}

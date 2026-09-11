@@ -1,4 +1,4 @@
-import { ApiCategory, ApiEndpoint } from '../types/openapi';
+import { ApiCategory } from '../types/openapi';
 
 export const generateMarkdownDocs = (categories: ApiCategory[]): string => {
   let markdown = '# SkillHub API Documentation\n\n';

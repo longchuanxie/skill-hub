@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
+import RoleRoute from './components/router/RoleRoute';
+import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -43,7 +46,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -72,12 +76,14 @@ function App() {
         <Route path="/agents" element={<ApiResourcesPage />} />
         <Route path="/agents/new" element={<ProtectedRoute><CreateAgentPage /></ProtectedRoute>} />
         <Route path="/agents/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><Layout><AdminDashboardPage /></Layout></ProtectedRoute>} />
-        <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsersPage /></Layout></ProtectedRoute>} />
-        <Route path="/admin/enterprises" element={<ProtectedRoute><Layout><AdminEnterprisesPage /></Layout></ProtectedRoute>} />
+        <Route path="/admin" element={<RoleRoute roles={['admin', 'super_admin']}><Layout><AdminDashboardPage /></Layout></RoleRoute>} />
+        <Route path="/admin/users" element={<RoleRoute roles={['admin', 'super_admin']}><Layout><AdminUsersPage /></Layout></RoleRoute>} />
+        <Route path="/admin/enterprises" element={<RoleRoute roles={['admin', 'super_admin']}><Layout><AdminEnterprisesPage /></Layout></RoleRoute>} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Toaster />
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

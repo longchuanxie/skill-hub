@@ -1,6 +1,6 @@
-import { createApiClient } from './client';
+import { apiClient } from './client';
 
-const searchClient = createApiClient();
+const searchClient = apiClient;
 
 export interface SearchResult {
   _id: string;

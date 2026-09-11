@@ -7,12 +7,16 @@ import { Text } from '@/components/typography/Text'
 
 interface ConfirmDialogProps {
   open: boolean
-  onOpenChange: (open: boolean) => void
+  onOpenChange?: (open: boolean) => void
   title: string
-  description: string
+  description?: string
+  /** Alias for description, accepted for call-site compatibility */
+  message?: string
   confirmText?: string
   cancelText?: string
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
+  /** Called when the dialog is dismissed via cancel */
+  onCancel?: () => void
   variant?: 'default' | 'destructive'
 }
 
@@ -21,18 +25,30 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onOpenChange,
   title,
   description,
+  message,
   confirmText = '确认',
   cancelText = '取消',
   onConfirm,
+  onCancel,
   variant = 'default'
 }) => {
   const [isLoading, setIsLoading] = useState(false)
+  const body = description ?? message ?? ''
+
+  const close = () => {
+    onOpenChange?.(false)
+  }
+
+  const handleCancel = () => {
+    onCancel?.()
+    close()
+  }
 
   const handleConfirm = async () => {
     setIsLoading(true)
     try {
       await onConfirm()
-      onOpenChange(false)
+      close()
     } finally {
       setIsLoading(false)
     }
@@ -54,21 +70,21 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               {title}
             </Text>
           </Flex>
-          
+
           <Text size="sm" color="secondary" className="pl-11">
-            {description}
+            {body}
           </Text>
-          
+
           <Flex justify="end" gap={3}>
-            <Button 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
+            <Button
+              variant="outline"
+              onClick={handleCancel}
               disabled={isLoading}
             >
               {cancelText}
             </Button>
-            <Button 
-              variant={variant} 
+            <Button
+              variant={variant}
               onClick={handleConfirm}
               disabled={isLoading}
             >

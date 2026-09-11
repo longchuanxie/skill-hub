@@ -24,11 +24,18 @@ const SkillsMarketPage: React.FC = () => {
   
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sort, setSort] = useState('latest');
+
+  // Debounce the search box so typing does not fire a request per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     fetchSkills();
-  }, [page, category, sort]);
+  }, [page, category, sort, debouncedSearch]);
 
   const fetchSkills = async () => {
     setLoading(true);
@@ -36,7 +43,7 @@ const SkillsMarketPage: React.FC = () => {
     try {
       const params: Record<string, unknown> = { page, pageSize, sort };
       if (category && category !== 'all') params.category = category;
-      if (search) params.search = search;
+      if (debouncedSearch) params.search = debouncedSearch;
       
       const data: SkillsResponse = await skillApi.getSkills(params);
       setSkills(data.skills);
@@ -52,8 +59,8 @@ const SkillsMarketPage: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setDebouncedSearch(search);
     setPage(1);
-    fetchSkills();
   };
 
   const handlePageChange = (newPage: number) => {
