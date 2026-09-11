@@ -121,8 +121,8 @@ export const previewSkillFile = async (req: AuthRequest, res: Response): Promise
     const extractedDir = await getOrExtractZip(zipPath);
 
     try {
-      const fullPath = path.join(extractedDir, filePath);
-      if (!fs.existsSync(fullPath)) {
+      const fullPath = resolveWithinDir(extractedDir, filePath);
+      if (!fullPath || !fs.existsSync(fullPath)) {
         res.status(404).json({ error: 'File not found' });
         return;
       }
@@ -202,6 +202,17 @@ function buildFileTree(dirPath: string, basePath: string = '', depth: number = 0
     if (a.type !== 'directory' && b.type === 'directory') return 1;
     return a.name.localeCompare(b.name);
   });
+}
+
+// Resolve a user-supplied relative path inside baseDir, rejecting traversal
+// outside of it. Returns null when the path escapes baseDir.
+function resolveWithinDir(baseDir: string, relativePath: string): string | null {
+  const resolvedBase = path.resolve(baseDir);
+  const resolved = path.resolve(resolvedBase, relativePath);
+  if (resolved !== resolvedBase && !resolved.startsWith(resolvedBase + path.sep)) {
+    return null;
+  }
+  return resolved;
 }
 
 function getMimeType(filePath: string): string {

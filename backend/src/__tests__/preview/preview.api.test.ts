@@ -220,5 +220,23 @@ describe('Skill Preview API', () => {
 
       expect(response.body).toHaveProperty('error');
     });
+
+    it('should reject path traversal attempts', async () => {
+      const response = await request(app)
+        .get(`/api/skills/${publicSkillId}/preview`)
+        .query({ path: '../../package.json' })
+        .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should reject deep path traversal attempts', async () => {
+      const response = await request(app)
+        .get(`/api/skills/${publicSkillId}/preview`)
+        .query({ path: 'src/../../../../../../../../etc/passwd' })
+        .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+    });
   });
 });

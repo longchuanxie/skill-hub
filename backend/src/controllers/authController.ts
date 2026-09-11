@@ -3,7 +3,7 @@ import { User } from '../models/User';
 import { Enterprise } from '../models/Enterprise';
 import { AdminInvitation } from '../models/AdminInvitation';
 import { AuditLog } from '../models/AuditLog';
-import { generateAccessToken, generateRefreshToken, verifyToken } from '../utils/jwt';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth';
 import { validationResult } from 'express-validator';
 import { createLogger } from '../utils/logger';
@@ -41,9 +41,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    // Set admin role for admin@example.com and admin2
-    const role = (email.toLowerCase() === 'admin@example.com' || username === 'admin2') ? 'admin' : 'user';
-    const user = new User({ username, email: email.toLowerCase(), password, role });
+    const user = new User({ username, email: email.toLowerCase(), password, role: 'user' });
     await user.save();
 
     const token = generateAccessToken(user);
@@ -186,7 +184,7 @@ export const refreshToken = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const payload = verifyToken(refreshToken);
+    const payload = verifyRefreshToken(refreshToken);
     const user = await User.findById(payload.userId);
     if (!user) {
       logger.warn('Refresh token failed - user not found', { userId: payload.userId });

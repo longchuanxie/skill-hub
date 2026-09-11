@@ -62,7 +62,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </svg>
                   {t('nav.agents')}
                 </Link>
-                {isAuthenticated && user && (user.role === 'admin' || user.username === 'admin2') && (
+                {isAuthenticated && user && (user.role === 'admin') && (
                   <Link
                     to="/admin"
                     className="flex items-center gap-1.5 text-gray-600 hover:text-black font-medium transition-colors"
@@ -127,7 +127,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         </svg>
                         {t('nav.settings')}
                       </button>
-                      {(user.role === 'admin' || user.username === 'admin2') && (
+                      {(user.role === 'admin') && (
                         <button
                           onClick={() => navigate('/admin')}
                           className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -249,7 +249,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </svg>
                     {t('nav.agents')}
                   </Link>
-                  {isAuthenticated && user && (user.role === 'admin' || user.username === 'admin2') && (
+                  {isAuthenticated && user && (user.role === 'admin') && (
                     <Link
                       to="/admin"
                       className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
