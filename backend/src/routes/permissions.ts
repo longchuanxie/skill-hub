@@ -7,12 +7,14 @@ import {
   updateCollaboratorPermission,
   removeCollaborator,
   getPermissionAuditLogs,
-  checkPermission
+  checkPermission,
+  getSharedWithMe,
 } from '../controllers/permissionController';
 
 const router = express.Router();
 
 router.get('/skills/:skillId/permissions', authenticate, getPermissions);
+router.get('/shared-with-me', authenticate, getSharedWithMe);
 router.put('/skills/:skillId/permissions', authenticate, updatePermissions);
 router.post('/skills/:skillId/collaborators', authenticate, addCollaborator);
 router.put('/skills/:skillId/collaborators/:userId', authenticate, updateCollaboratorPermission);

@@ -20,6 +20,17 @@ const router = Router();
 
 router.use(authenticateAgent);
 
+// allowedResources, when non-empty, restricts the agent to named resources.
+const nameFilter = (agent: AgentRequest['agent']): Record<string, unknown> | undefined => {
+  const allowed = agent.permissions.allowedResources;
+  return allowed && allowed.length > 0 ? { name: { $in: allowed } } : undefined;
+};
+
+const isNameAllowed = (agent: AgentRequest['agent'], name: string): boolean => {
+  const allowed = agent.permissions.allowedResources;
+  return !allowed || allowed.length === 0 || allowed.includes(name);
+};
+
 router.get('/skills', async (req: AgentRequest, res: Response) => {
   try {
     if (!req.agent.permissions.canRead) {
@@ -31,6 +42,7 @@ router.get('/skills', async (req: AgentRequest, res: Response) => {
     const skip = (Number(page) - 1) * Number(pageSize);
 
     const query: any = {
+      ...(nameFilter(req.agent) || {}),
       $or: [
         { visibility: 'public' },
         { owner: req.agent.owner },
@@ -71,6 +83,7 @@ router.get('/prompts', async (req: AgentRequest, res: Response) => {
     const skip = (Number(page) - 1) * Number(pageSize);
 
     const query: any = {
+      ...(nameFilter(req.agent) || {}),
       $or: [
         { visibility: 'public' },
         { owner: req.agent.owner },
@@ -110,6 +123,11 @@ router.get('/skills/:id/download', async (req: AgentRequest, res: Response) => {
     const skill = await Skill.findById(req.params.id);
     if (!skill) {
       res.status(404).json({ error: 'SKILL_NOT_FOUND', message: 'Skill not found' });
+      return;
+    }
+
+    if (!isNameAllowed(req.agent, skill.name ?? '')) {
+      res.status(403).json(createErrorResponse(ErrorCode.READ_PERMISSION_DENIED));
       return;
     }
 

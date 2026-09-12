@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import unzipper from 'unzipper';
 import { cache } from '../utils/cache';
+import { canReadResource } from '../utils/resourceAccess';
 import crypto from 'crypto';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
 import { createLogger } from '../utils/logger';
@@ -32,7 +33,10 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const hasAccess = skill.visibility === 'public' || String(skill.owner) === req.user?.userId;
+    const hasAccess = await canReadResource(skill, {
+      userId: req.user?.userId,
+      enterpriseId: req.user?.enterpriseId,
+    });
 
     if (!hasAccess) {
       res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
@@ -100,7 +104,10 @@ export const previewSkillFile = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const hasAccess = skill.visibility === 'public' || String(skill.owner) === req.user?.userId;
+    const hasAccess = await canReadResource(skill, {
+      userId: req.user?.userId,
+      enterpriseId: req.user?.enterpriseId,
+    });
 
     if (!hasAccess) {
       res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));

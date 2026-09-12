@@ -6,18 +6,9 @@ import { validationResult } from 'express-validator';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
 import { AuditLog } from '../models/AuditLog';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '../utils/email';
 
 const logger = createLogger('AdminInvitationController');
-
-// 配置邮件服务
-const transporter = nodemailer.createTransport({
-  service: 'Gmail',
-  auth: {
-    user: process.env.SMTP_USER || process.env.EMAIL_USER,
-    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
-  },
-});
 
 export const createInvitation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -73,7 +64,6 @@ export const createInvitation = async (req: AuthRequest, res: Response): Promise
     // 发送邀请邮件
     const invitationLink = `${process.env.FRONTEND_URL}/register/admin?code=${invitation.inviteCode}`;
     const mailOptions = {
-      from: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || process.env.EMAIL_USER,
       to: email,
       subject: 'SkillHub 管理员邀请',
       html: `
@@ -106,7 +96,15 @@ export const createInvitation = async (req: AuthRequest, res: Response): Promise
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    const emailResult = await sendEmail({
+      to: email,
+      subject: mailOptions.subject,
+      html: mailOptions.html,
+      text: invitationLink,
+    });
+    if (!emailResult.success) {
+      logger.error('Failed to send admin invitation email', { email, error: emailResult.error });
+    }
 
     // 记录审计日志
     await AuditLog.create({
@@ -119,7 +117,11 @@ export const createInvitation = async (req: AuthRequest, res: Response): Promise
       userAgent: req.get('user-agent'),
     });
 
-    logger.info('Admin invitation created successfully', { invitationId: invitation._id, email, role });
+    logger.info('Admin invitation created successfully', {
+      invitationId: invitation._id,
+      email,
+      role,
+    });
 
     res.status(201).json({
       message: '邀请已发送',
@@ -132,9 +134,9 @@ export const createInvitation = async (req: AuthRequest, res: Response): Promise
       },
     });
   } catch (error) {
-    logger.error('Create invitation failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined 
+    logger.error('Create invitation failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -170,9 +172,9 @@ export const getInvitations = async (req: AuthRequest, res: Response): Promise<v
       },
     });
   } catch (error) {
-    logger.error('Get invitations failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined 
+    logger.error('Get invitations failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -202,7 +204,10 @@ export const cancelInvitation = async (req: AuthRequest, res: Response): Promise
     }
 
     if (invitation.status !== 'pending') {
-      logger.warn('Cancel invitation failed - invitation already used or expired', { id, status: invitation.status });
+      logger.warn('Cancel invitation failed - invitation already used or expired', {
+        id,
+        status: invitation.status,
+      });
       res.status(400).json({ message: '邀请已被使用或已过期' });
       return;
     }
@@ -225,10 +230,10 @@ export const cancelInvitation = async (req: AuthRequest, res: Response): Promise
 
     res.json({ message: '邀请已取消' });
   } catch (error) {
-    logger.error('Cancel invitation failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined, 
-      invitationId: req.params.id 
+    logger.error('Cancel invitation failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      invitationId: req.params.id,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
@@ -253,12 +258,20 @@ export const verifyInvitation = async (req: AuthRequest, res: Response): Promise
     }
 
     if (!invitation.isValid()) {
-      logger.warn('Verify invitation failed - invitation invalid', { code, status: invitation.status, expiresAt: invitation.expiresAt });
+      logger.warn('Verify invitation failed - invitation invalid', {
+        code,
+        status: invitation.status,
+        expiresAt: invitation.expiresAt,
+      });
       res.status(400).json({ message: '邀请已过期或已被使用' });
       return;
     }
 
-    logger.info('Invitation verified successfully', { code, email: invitation.email, role: invitation.role });
+    logger.info('Invitation verified successfully', {
+      code,
+      email: invitation.email,
+      role: invitation.role,
+    });
 
     res.json({
       message: '邀请有效',
@@ -269,9 +282,9 @@ export const verifyInvitation = async (req: AuthRequest, res: Response): Promise
       },
     });
   } catch (error) {
-    logger.error('Verify invitation failed', { 
-      error: error instanceof Error ? error.message : String(error), 
-      stack: error instanceof Error ? error.stack : undefined 
+    logger.error('Verify invitation failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);

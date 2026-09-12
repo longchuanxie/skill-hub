@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: 'super_admin' | 'admin' | 'audit_admin' | 'enterprise_admin' | 'developer' | 'user';
+  status: 'active' | 'disabled';
   enterpriseId?: Schema.Types.ObjectId;
   avatar?: string;
   isEmailVerified: boolean;
@@ -69,6 +70,11 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['super_admin', 'admin', 'audit_admin', 'enterprise_admin', 'developer', 'user'],
       default: 'user',
+    },
+    status: {
+      type: String,
+      enum: ['active', 'disabled'],
+      default: 'active',
     },
     enterpriseId: {
       type: Schema.Types.ObjectId,

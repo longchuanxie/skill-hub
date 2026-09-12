@@ -213,8 +213,8 @@ export const updateUserStatus = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const oldStatus = (user as any).status || 'active';
-    (user as any).status = status;
+    const oldStatus = user.status || 'active';
+    user.status = status;
     await user.save();
 
     await AuditLog.create({
@@ -343,5 +343,81 @@ export const getEnterpriseById = async (req: AuthRequest, res: Response): Promis
     });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
+  }
+};
+
+export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { page = 1, pageSize = 20, action, targetType } = req.query;
+    const skip = (Number(page) - 1) * Number(pageSize);
+
+    const filter: any = {};
+    if (action) filter.action = action;
+    if (targetType) filter.targetType = targetType;
+
+    const [logs, total] = await Promise.all([
+      AuditLog.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(pageSize))
+        .populate('actor', 'username email')
+        .lean(),
+      AuditLog.countDocuments(filter),
+    ]);
+
+    res.json({
+      logs,
+      pagination: {
+        page: Number(page),
+        pageSize: Number(pageSize),
+        total,
+        pages: Math.ceil(total / Number(pageSize)),
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to get audit logs', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
+  }
+};
+
+export const updateEnterprisePlan = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { plan } = req.body;
+
+    if (!['free', 'pro', 'enterprise'].includes(plan)) {
+      const error = createErrorResponse(
+        ErrorCode.INVALID_INPUT,
+        'plan must be free | pro | enterprise',
+      );
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    const enterprise = await Enterprise.findByIdAndUpdate(id, { plan }, { new: true });
+    if (!enterprise) {
+      const error = createErrorResponse(ErrorCode.ENTERPRISE_NOT_FOUND);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    await AuditLog.create({
+      action: 'enterprise.plan.update',
+      actor: req.user!.userId,
+      targetType: 'enterprise',
+      targetId: enterprise._id,
+      details: { plan },
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    res.json(enterprise);
+  } catch (error) {
+    logger.error('Failed to update enterprise plan', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(500).json(createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 };

@@ -41,6 +41,16 @@ export const authApi = {
     return response.data;
   },
 
+  registerAdmin: async (data: {
+    inviteCode: string;
+    email: string;
+    username: string;
+    password: string;
+  }) => {
+    const response = await apiClient.post('/auth/register/admin', data);
+    return response.data;
+  },
+
   logout: async (): Promise<void> => {
     await authClient.post('/auth/logout');
     useAuthStore.getState().logout();
@@ -62,7 +72,10 @@ export const authApi = {
   },
 
   refreshToken: async (refreshToken: string): Promise<{ token: string; refreshToken: string }> => {
-    const response = await authClient.post<{ token: string; refreshToken: string }>('/auth/refresh', { refreshToken });
+    const response = await authClient.post<{ token: string; refreshToken: string }>(
+      '/auth/refresh',
+      { refreshToken },
+    );
     return response.data;
   },
 };

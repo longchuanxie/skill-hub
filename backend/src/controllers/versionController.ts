@@ -9,6 +9,7 @@ import fs from 'fs';
 import AdmZip from 'adm-zip';
 import { createLogger } from '../utils/logger';
 import { nextVersionNumber } from '../utils/resourceHelpers';
+import { canReadResource } from '../utils/resourceAccess';
 
 const logger = createLogger('versionController');
 
@@ -17,15 +18,17 @@ const logger = createLogger('versionController');
 // else only by its owner.
 type ResourceDoc = { owner: { toString(): string }; visibility: string; status?: string };
 
-const checkReadAccess = (resource: ResourceDoc, userId?: string): boolean => {
-  if (userId && resource.owner.toString() === userId) return true;
-  return resource.visibility === 'public' && resource.status !== 'rejected';
-};
+const checkReadAccess = async (
+  resource: ResourceDoc,
+  userId?: string,
+  enterpriseId?: string,
+): Promise<boolean> => canReadResource(resource, { userId, enterpriseId });
 
 const loadReadableResource = async (
   resourceType: string,
   resourceId: string,
   userId?: string,
+  enterpriseId?: string,
 ): Promise<ResourceDoc | null | 'denied'> => {
   const resource =
     resourceType === 'skill'
@@ -35,7 +38,8 @@ const loadReadableResource = async (
         : null;
 
   if (!resource) return null;
-  if (!checkReadAccess(resource as unknown as ResourceDoc, userId)) return 'denied';
+  if (!(await checkReadAccess(resource as unknown as ResourceDoc, userId, enterpriseId)))
+    return 'denied';
   return resource as unknown as ResourceDoc;
 };
 
@@ -242,23 +246,74 @@ export const rollbackVersion = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Rollback = create a NEW version record carrying the old content.
+    // Just patching the main record left download/preview serving the
+    // newest SkillVersion/PromptVersion, so the rollback never took effect.
+    const rollbackChangelog = `Rollback to version ${targetVersion.version}`;
+    const rollbackVersionNumber = await nextVersionNumber(String(resourceId));
+
     if (targetVersion.resourceType === 'skill') {
+      const skill = resource as any;
+      const newSemver = await (
+        await import('../controllers/SkillController')
+      ).generateNextVersion(skill._id);
+      if (targetVersion.files?.length > 0) {
+        const { SkillVersion } = await import('../models/SkillVersion');
+        await SkillVersion.create({
+          skillId: skill._id,
+          version: newSemver,
+          url: targetVersion.files[0].path,
+          filename: targetVersion.files[0].filename,
+          originalName: targetVersion.files[0].filename,
+          size: targetVersion.files[0].size ?? 0,
+          mimetype: targetVersion.files[0].mimetype ?? 'application/zip',
+          updateDescription: rollbackChangelog,
+        });
+      }
       await Skill.findByIdAndUpdate(resourceId, {
-        version: targetVersion.version,
-        description: targetVersion.content,
+        version: newSemver,
+        description: targetVersion.content || skill.description,
         files: targetVersion.files,
       });
     } else {
+      const prompt = resource as any;
+      const { PromptVersion } = await import('../models/PromptVersion');
+      const nextPromptNumber = (await PromptVersion.countDocuments({ promptId: resourceId })) + 1;
+      const newSemver = `1.0.${nextPromptNumber}`;
+      await PromptVersion.create({
+        promptId: resourceId,
+        version: newSemver,
+        content: targetVersion.content || prompt.content,
+        description: prompt.description,
+        variables: prompt.variables || [],
+        updateDescription: rollbackChangelog,
+      });
       await Prompt.findByIdAndUpdate(resourceId, {
-        version: targetVersion.version,
-        content: targetVersion.content,
+        version: newSemver,
+        content: targetVersion.content || prompt.content,
         files: targetVersion.files,
       });
     }
 
+    await ResourceVersion.create({
+      resourceId: resource._id,
+      resourceType: targetVersion.resourceType,
+      version: `rollback-${targetVersion.version}-${Date.now()}`,
+      versionNumber: rollbackVersionNumber,
+      content: targetVersion.content,
+      files: targetVersion.files,
+      changelog: rollbackChangelog,
+      tags: [],
+      createdBy: userId,
+      isActive: true,
+      fileManifest: targetVersion.fileManifest,
+      comparisonStatus: 'completed',
+    });
+
     res.json({
       success: true,
       message: 'Rolled back successfully',
+      rolledBackTo: targetVersion.version,
     });
   } catch (error) {
     logger.error('回滚版本时出错:', error);
@@ -496,7 +551,11 @@ export const downloadVersion = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const hasAccess = checkReadAccess(resource as unknown as ResourceDoc, userId);
+    const hasAccess = await checkReadAccess(
+      resource as unknown as ResourceDoc,
+      userId,
+      req.user?.enterpriseId,
+    );
 
     if (!hasAccess) {
       return res.status(403).json({

@@ -11,6 +11,8 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const InvitationAcceptPage = lazy(() => import('./pages/InvitationAcceptPage'));
+const RegisterAdminPage = lazy(() => import('./pages/RegisterAdminPage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const SkillsMarketPage = lazy(() => import('./pages/SkillsMarketPage'));
@@ -62,6 +64,8 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/register/admin" element={<RegisterAdminPage />} />
+            <Route path="/invitations" element={<InvitationAcceptPage />} />
 
             <Route
               path="/"

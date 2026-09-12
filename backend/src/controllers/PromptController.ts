@@ -8,6 +8,7 @@ import { ErrorCode, createErrorResponse } from '../utils/errors';
 import { Types } from 'mongoose';
 import { reviewPrompt } from '../utils/resourceAutoReview';
 import { Comment } from '../models/Comment';
+import { canReadResource } from '../utils/resourceAccess';
 
 const logger = createLogger('PromptController');
 
@@ -170,6 +171,18 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
+    const finalVisibility = visibility || 'private';
+    if (finalVisibility === 'enterprise' || finalVisibility === 'shared') {
+      if (!req.user?.enterpriseId) {
+        const error = createErrorResponse(
+          ErrorCode.OPERATION_NOT_ALLOWED,
+          'Enterprise visibility requires enterprise membership',
+        );
+        res.status(error.statusCode).json(error);
+        return;
+      }
+    }
+
     const prompt = new Prompt({
       name,
       description,
@@ -178,9 +191,12 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       category: category || 'general',
       tags: tags || [],
       owner: req.user?.userId,
-      visibility: visibility || 'private',
+      visibility: finalVisibility,
       status: finalStatus,
       version: '1.0.0',
+      ...(finalVisibility === 'enterprise' || finalVisibility === 'shared'
+        ? { enterpriseId: req.user.enterpriseId }
+        : {}),
     });
 
     await prompt.save();
@@ -503,9 +519,10 @@ export const renderPrompt = async (req: AuthRequest, res: Response): Promise<voi
 
     // Rendering exposes the full prompt content - require the same read
     // access as viewing the prompt itself.
-    const hasAccess =
-      (prompt.visibility === 'public' && prompt.status !== 'rejected') ||
-      String(prompt.owner) === req.user?.userId;
+    const hasAccess = await canReadResource(prompt, {
+      userId: req.user?.userId,
+      enterpriseId: req.user?.enterpriseId,
+    });
     if (!hasAccess) {
       const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
       res.status(error.statusCode).json(error);
@@ -544,7 +561,10 @@ export const copyPrompt = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    const hasAccess = prompt.visibility === 'public' || String(prompt.owner) === req.user?.userId;
+    const hasAccess = await canReadResource(prompt, {
+      userId: req.user?.userId,
+      enterpriseId: req.user?.enterpriseId,
+    });
 
     if (!hasAccess) {
       const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
@@ -552,8 +572,16 @@ export const copyPrompt = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    // Pick the first free "<name> (Copy)" slot - the second copy used to
+    // collide with the (owner, name) unique index.
+    let copyName = `${prompt.name} (Copy)`;
+    let suffix = 2;
+    while (await Prompt.exists({ owner: req.user?.userId, name: copyName })) {
+      copyName = `${prompt.name} (Copy ${suffix++})`;
+    }
+
     const copiedPrompt = new Prompt({
-      name: `${prompt.name} (Copy)`,
+      name: copyName,
       description: prompt.description,
       content: prompt.content,
       variables: prompt.variables,

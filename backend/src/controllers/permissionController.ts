@@ -497,3 +497,47 @@ export const checkPermission = async (req: AuthRequest, res: Response): Promise<
     res.status(err.statusCode).json(err);
   }
 };
+
+export const getSharedWithMe = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      const error = createErrorResponse(ErrorCode.TOKEN_MISSING);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
+    // Skills where the caller is a collaborator (any role).
+    const perms = await SkillPermissions.find({
+      'collaborators.userId': userId,
+    })
+      .select('skillId collaborators')
+      .lean();
+
+    const skillIds = perms.map((p) => p.skillId);
+    const skills = await Skill.find({ _id: { $in: skillIds } })
+      .populate('owner', 'username avatar')
+      .lean();
+
+    // Attach the caller's role per skill for the frontend.
+    const roleBySkill = new Map<string, string>();
+    for (const perm of perms) {
+      const entry = (perm.collaborators || []).find((c: any) => String(c.userId) === userId);
+      if (entry) roleBySkill.set(String(perm.skillId), entry.role);
+    }
+
+    res.json({
+      skills: skills.map((skill) => ({
+        ...skill,
+        collaboratorRole: roleBySkill.get(String(skill._id)),
+      })),
+    });
+  } catch (error) {
+    logger.error('Get shared with me failed', {
+      error: error instanceof Error ? error.message : String(error),
+      userId: req.user?.userId,
+    });
+    const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    res.status(err.statusCode).json(err);
+  }
+};

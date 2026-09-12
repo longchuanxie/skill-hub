@@ -6,6 +6,7 @@ import { AuditLog } from '../models/AuditLog';
 import { AuthRequest } from '../middleware/auth';
 import { getFileUrl } from '../middleware/upload';
 import { createLogger } from '../utils/logger';
+import { sendEmail } from '../utils/email';
 import crypto from 'crypto';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
 
@@ -223,6 +224,24 @@ export const inviteMember = async (req: AuthRequest, res: Response): Promise<voi
     });
 
     logger.info('Invitation created', { invitationId: invitation._id, email, enterpriseId: id });
+
+    // Actually deliver the invitation; the accept link targets the
+    // frontend page that calls POST /api/invitation/:token/accept.
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const acceptUrl = `${frontendUrl}/invitations?token=${token}`;
+    const emailResult = await sendEmail({
+      to: email,
+      subject: `SkillHub 企业邀请 - ${enterprise.name}`,
+      html: `<p>您好，</p><p>您被邀请加入企业「${enterprise.name}」（角色：${role}）。</p><p>请使用与该邮箱对应的账号登录后点击以下链接接受邀请（7 天内有效）：</p><p><a href="${acceptUrl}">${acceptUrl}</a></p>`,
+      text: `您被邀请加入企业 ${enterprise.name}（角色：${role}）。请在登录后访问以下链接接受邀请（7 天内有效）：${acceptUrl}`,
+    });
+    if (!emailResult.success) {
+      logger.error('Failed to send invitation email', {
+        email,
+        enterpriseId: id,
+        error: emailResult.error,
+      });
+    }
 
     res.status(201).json(invitation);
   } catch (error) {
@@ -481,6 +500,13 @@ export const removeMember = async (req: AuthRequest, res: Response): Promise<voi
 
     enterprise.members = enterprise.members.filter((m) => m.userId.toString() !== memberId);
     await enterprise.save();
+
+    // Clear the removed member's enterprise pointer so their context does
+    // not reference a roster they are no longer on.
+    await User.updateOne(
+      { _id: memberId, enterpriseId: enterprise._id },
+      { $unset: { enterpriseId: 1 } },
+    );
 
     res.json({ message: 'Member removed' });
   } catch (error) {

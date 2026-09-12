@@ -52,6 +52,18 @@ export const authenticate = async (
       return;
     }
 
+    if (user.status === 'disabled') {
+      logger.warn('Authentication failed - account disabled', {
+        userId: payload.userId,
+        path: req.path,
+      });
+      res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
+      return;
+    }
+
+    // Refresh the enterpriseId claim so visibility checks use the user's
+    // current enterprise, not the one baked into the token at issue time.
+    payload.enterpriseId = user.enterpriseId?.toString();
     req.user = payload;
     logger.debug('User authenticated successfully', {
       userId: payload.userId,

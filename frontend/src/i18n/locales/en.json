@@ -49,7 +49,10 @@
     "loading": "Loading...",
     "loadFailed": "Failed to load resources",
     "gridView": "Grid View",
-    "listView": "List View"
+    "listView": "List View",
+    "shared": "Shared with me",
+    "noShared": "No skills shared with you yet",
+    "noSharedHint": "Skills appear here once their owners add you as a collaborator"
   },
   "auth": {
     "login": "Login",
@@ -711,5 +714,25 @@
         }
       }
     }
+  },
+  "invitations": {
+    "title": "Enterprise Invitation",
+    "accepting": "Accepting invitation…",
+    "accepted": "Joined the enterprise",
+    "failed": "Failed to accept invitation",
+    "goSettings": "Open settings"
+  },
+  "registerAdmin": {
+    "title": "Admin Registration",
+    "subtitle": "Register with the invite code from your invitation email",
+    "inviteCode": "Invite code",
+    "email": "Email (must match the invitation)",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Register",
+    "submitting": "Registering…",
+    "failed": "Registration failed - check the invite code and email",
+    "hasAccount": "Already have an account?",
+    "login": "Log in"
   }
 }

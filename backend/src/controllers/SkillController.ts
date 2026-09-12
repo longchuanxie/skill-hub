@@ -14,6 +14,7 @@ import { Types } from 'mongoose';
 import { ResourceVersion } from '../models/ResourceVersion';
 import { SkillPermissions } from '../models/SkillPermissions';
 import { Comment } from '../models/Comment';
+import { canReadResource, canWriteResource } from '../utils/resourceAccess';
 
 const logger = createLogger('SkillController');
 
@@ -148,6 +149,20 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
       compatibility: compatibility || [],
     };
 
+    // Enterprise/shared visibility requires an enterprise to attach to.
+    if (skillData.visibility === 'enterprise' || skillData.visibility === 'shared') {
+      if (!req.user?.enterpriseId) {
+        const error = createErrorResponse(
+          ErrorCode.OPERATION_NOT_ALLOWED,
+          'Enterprise visibility requires enterprise membership',
+        );
+        res.status(error.statusCode).json(error);
+        unlinkUploadedFile(req);
+        return;
+      }
+      skillData.enterpriseId = req.user.enterpriseId;
+    }
+
     if (hasFile) {
       if (!req.file!.originalname.endsWith('.zip')) {
         logger.warn('Create skill failed - invalid file type', {
@@ -238,9 +253,36 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
       });
 
       const previousVersion = existingSkill.version;
-      const newVersion = await generateNextVersion(existingSkill._id);
 
-      if (hasFile) {
+      // Re-run review on re-upload so a rejected skill can recover and the
+      // uploader sees the verdict.
+      let reuploadStatus: string | undefined;
+      let reuploadReview: { passed: boolean; issues?: string[]; warnings?: string[] } | undefined;
+      if (status === 'approved' || status === 'pending') {
+        if (hasFile) {
+          const reviewResult = await reviewSkill(
+            { name, description, category, tags },
+            req.file!.path,
+          );
+          reuploadReview = {
+            passed: reviewResult.passed,
+            issues: reviewResult.reasons,
+            warnings: reviewResult.warnings,
+          };
+          reuploadStatus = reviewResult.passed ? 'approved' : 'rejected';
+        } else {
+          reuploadStatus = 'draft';
+          reuploadReview = { passed: false, issues: ['提交审核需要上传文件'] };
+        }
+      }
+
+      // A version record is only created when a file was uploaded; without
+      // one the version string must not advance (it used to skip numbers).
+      const newVersion = hasFile
+        ? await generateNextVersion(existingSkill._id)
+        : existingSkill.version;
+
+      if (hasFile && (!reuploadReview || reuploadReview.passed)) {
         const fileUrl = getFileUrl(req.file!.filename);
         const skillVersion = new SkillVersion({
           skillId: existingSkill._id,
@@ -291,7 +333,8 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
         });
       }
 
-      existingSkill.version = newVersion;
+      if (hasFile) existingSkill.version = newVersion;
+      if (reuploadStatus) existingSkill.status = reuploadStatus as typeof existingSkill.status;
       if (skillData.description) existingSkill.description = skillData.description;
       if (skillData.category) existingSkill.category = skillData.category;
       if (skillData.tags && skillData.tags.length > 0) existingSkill.tags = skillData.tags;
@@ -309,12 +352,18 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
         userId: req.user?.userId,
       });
 
+      if (hasFile && reuploadReview && !reuploadReview.passed) {
+        // Rejected re-upload: no version record was created, drop the file.
+        unlinkUploadedFile(req);
+      }
+
       res.status(200).json({
         message: 'Skill version updated successfully',
         skill: existingSkill,
         isNew: false,
         previousVersion,
-        currentVersion: newVersion,
+        currentVersion: existingSkill.version,
+        autoReviewResult: reuploadReview,
       });
       return;
     }
@@ -466,8 +515,10 @@ export const getSkillById = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     const ownerId = skill.owner ? (skill.owner as any)._id || skill.owner : null;
-    const hasAccess =
-      skill.visibility === 'public' || (ownerId && String(ownerId) === req.user?.userId);
+    const hasAccess = await canReadResource(skill, {
+      userId: req.user?.userId,
+      enterpriseId: req.user?.enterpriseId,
+    });
 
     if (!hasAccess) {
       logger.warn('Get skill failed - access denied', {
@@ -516,7 +567,8 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    if (String(skill.owner) !== req.user?.userId) {
+    const accessCtx = { userId: req.user?.userId, enterpriseId: req.user?.enterpriseId };
+    if (!(await canWriteResource(skill, accessCtx))) {
       const error = createErrorResponse(ErrorCode.NOT_AUTHORIZED);
       res.status(error.statusCode).json(error);
       return;
@@ -524,17 +576,17 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
 
     const hasFile = req.file != null;
 
-    if (hasFile) {
-      if (!req.file!.originalname.endsWith('.zip')) {
-        const error = createErrorResponse(ErrorCode.INVALID_FILE_TYPE);
-        res.status(error.statusCode).json(error);
-        unlinkUploadedFile(req);
-        return;
-      }
+    if (hasFile && !req.file!.originalname.endsWith('.zip')) {
+      const error = createErrorResponse(ErrorCode.INVALID_FILE_TYPE);
+      res.status(error.statusCode).json(error);
+      unlinkUploadedFile(req);
+      return;
+    }
 
+    // Validate the new package before anything is persisted.
+    if (hasFile) {
       const tempDir = path.join(process.cwd(), 'temp', `skill-${Date.now()}`);
       fs.mkdirSync(tempDir, { recursive: true });
-
       try {
         const validationResult = await validateSkillUpload(req.file!.path, tempDir);
         if (!validationResult.valid) {
@@ -546,67 +598,6 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
           unlinkUploadedFile(req);
           return;
         }
-
-        const fileUrl = getFileUrl(req.file!.filename);
-        const nextVersion = await generateNextVersion(skill._id);
-
-        const skillVersion = new SkillVersion({
-          skillId: skill._id,
-          version: nextVersion,
-          url: fileUrl,
-          filename: req.file!.filename,
-          originalName: req.file!.originalname,
-          size: req.file!.size,
-          mimetype: req.file!.mimetype,
-          updateDescription: updateDescription || `Update to version ${nextVersion}`,
-        });
-        await skillVersion.save();
-
-        await createResourceVersion({
-          resourceId: skill._id.toString(),
-          resourceType: 'skill',
-          version: nextVersion,
-          content: skill.description || '',
-          files: [
-            {
-              filename: req.file!.originalname,
-              path: fileUrl,
-              size: req.file!.size,
-              mimetype: req.file!.mimetype,
-            },
-          ],
-          changelog: updateDescription || `Update to version ${nextVersion}`,
-          tags: skill.tags || [],
-          createdBy: req.user!.userId.toString(),
-        });
-
-        skill.version = nextVersion;
-
-        skill.files = [
-          {
-            filename: req.file!.originalname,
-            originalName: req.file!.originalname,
-            path: fileUrl,
-            size: req.file!.size,
-            mimetype: req.file!.mimetype,
-          },
-        ];
-
-        if (validationResult.structure) {
-          if (validationResult.structure.name) skill.name = validationResult.structure.name;
-          if (validationResult.structure.description)
-            skill.description = validationResult.structure.description;
-        }
-
-        if (!skill.name && validationResult.topLevelDir) {
-          skill.name = validationResult.topLevelDir;
-          logger.debug('Using top-level directory name as skill name', { name: skill.name });
-        }
-
-        logger.debug('Skill version created', {
-          skillVersionId: skillVersion._id,
-          version: nextVersion,
-        });
       } finally {
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
@@ -614,63 +605,137 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
       }
     }
 
-    if (name) skill.name = name;
-    if (description) skill.description = description;
-    if (category) skill.category = category;
-    if (tags) skill.tags = tags;
-    if (visibility) skill.visibility = visibility;
+    // Public skills must carry a file (also when flipping visibility on an
+    // existing file-less skill).
+    const nextVisibility = visibility || skill.visibility;
+    if (nextVisibility === 'public' && !hasFile && skill.files.length === 0) {
+      const error = createErrorResponse(ErrorCode.PUBLIC_SKILL_REQUIRES_FILE);
+      res.status(error.statusCode).json(error);
+      unlinkUploadedFile(req);
+      return;
+    }
 
+    if (nextVisibility === 'enterprise' || nextVisibility === 'shared') {
+      if (!accessCtx.enterpriseId) {
+        const error = createErrorResponse(
+          ErrorCode.OPERATION_NOT_ALLOWED,
+          'Enterprise visibility requires enterprise membership',
+        );
+        res.status(error.statusCode).json(error);
+        unlinkUploadedFile(req);
+        return;
+      }
+    }
+
+    const nextName = name || skill.name;
+    if (!nextName) {
+      const error = createErrorResponse(ErrorCode.NAME_REQUIRED);
+      res.status(error.statusCode).json(error);
+      unlinkUploadedFile(req);
+      return;
+    }
+
+    // Review FIRST: a rejected upload must never become the latest version.
     let autoReviewResult: { passed: boolean; issues?: string[]; warnings?: string[] } | undefined;
+    let finalStatus: string | undefined;
 
     if (status === 'approved' || status === 'pending') {
       if (hasFile || skill.files.length > 0) {
-        const filePath = hasFile ? req.file!.path : undefined;
         const reviewResult = await reviewSkill(
           {
-            name: skill.name,
-            description: skill.description,
-            category: skill.category,
-            tags: skill.tags,
+            name: nextName,
+            description: description || skill.description,
+            category: category || skill.category,
+            tags: tags || skill.tags,
           },
-          filePath,
+          hasFile ? req.file!.path : undefined,
         );
         autoReviewResult = {
           passed: reviewResult.passed,
           issues: reviewResult.reasons,
           warnings: reviewResult.warnings,
         };
-        if (reviewResult.passed) {
-          skill.status = 'approved';
-        } else {
-          skill.status = 'rejected';
-        }
+        finalStatus = reviewResult.passed ? 'approved' : 'rejected';
         logger.info('Skill update auto review completed', {
           skillId: skill._id,
           userId: req.user?.userId,
           passed: reviewResult.passed,
-          status: skill.status,
+          status: finalStatus,
         });
       } else {
-        skill.status = 'draft';
-        autoReviewResult = {
-          passed: false,
-          issues: ['提交审核需要上传文件'],
-        };
+        finalStatus = 'draft';
+        autoReviewResult = { passed: false, issues: ['提交审核需要上传文件'] };
       }
-    } else if (status) {
-      skill.status = status;
+    } else if (status === 'draft') {
+      finalStatus = 'draft';
     }
 
-    if (!skill.name) {
-      logger.warn('Update skill failed - name is required', {
-        userId: req.user?.userId,
-        skillId: id,
+    // Only persist the new file as a version when it passed review (or no
+    // review was requested).
+    const reviewPassed = !autoReviewResult || autoReviewResult.passed;
+
+    if (hasFile && reviewPassed) {
+      const fileUrl = getFileUrl(req.file!.filename);
+      const nextVersion = await generateNextVersion(skill._id);
+
+      const skillVersion = new SkillVersion({
+        skillId: skill._id,
+        version: nextVersion,
+        url: fileUrl,
+        filename: req.file!.filename,
+        originalName: req.file!.originalname,
+        size: req.file!.size,
+        mimetype: req.file!.mimetype,
+        updateDescription: updateDescription || `Update to version ${nextVersion}`,
       });
-      const error = createErrorResponse(ErrorCode.NAME_REQUIRED);
-      res.status(error.statusCode).json(error);
-      unlinkUploadedFile(req);
-      return;
+      await skillVersion.save();
+
+      skill.files = [
+        {
+          filename: req.file!.originalname,
+          originalName: req.file!.originalname,
+          path: fileUrl,
+          size: req.file!.size,
+          mimetype: req.file!.mimetype,
+        },
+      ];
+      skill.version = nextVersion;
+
+      await createResourceVersion({
+        resourceId: skill._id.toString(),
+        resourceType: 'skill',
+        version: nextVersion,
+        content: description || skill.description || '',
+        files: [
+          {
+            filename: req.file!.originalname,
+            path: fileUrl,
+            size: req.file!.size,
+            mimetype: req.file!.mimetype,
+          },
+        ],
+        changelog: updateDescription || `Update to version ${nextVersion}`,
+        tags: tags || skill.tags || [],
+        createdBy: req.user!.userId.toString(),
+      });
     }
+
+    if (hasFile && !reviewPassed) {
+      // A rejected upload leaves no trace in the version history.
+      unlinkUploadedFile(req);
+    }
+
+    if (name) skill.name = name;
+    if (description) skill.description = description;
+    if (category) skill.category = category;
+    if (tags) skill.tags = tags;
+    if (visibility) {
+      skill.visibility = visibility;
+      if ((visibility === 'enterprise' || visibility === 'shared') && accessCtx.enterpriseId) {
+        skill.enterpriseId = accessCtx.enterpriseId as unknown as typeof skill.enterpriseId;
+      }
+    }
+    if (finalStatus) skill.status = finalStatus as typeof skill.status;
 
     await skill.save();
     res.json({ skill, autoReviewResult });
@@ -903,7 +968,10 @@ export const downloadSkill = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const hasAccess = skill.visibility === 'public' || String(skill.owner) === req.user?.userId;
+    const hasAccess = await canReadResource(skill, {
+      userId: req.user?.userId,
+      enterpriseId: req.user?.enterpriseId,
+    });
 
     if (!hasAccess) {
       const error = createErrorResponse(ErrorCode.ACCESS_DENIED);

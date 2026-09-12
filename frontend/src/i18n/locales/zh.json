@@ -49,7 +49,10 @@
     "loading": "加载中...",
     "loadFailed": "加载资源失败",
     "gridView": "网格视图",
-    "listView": "列表视图"
+    "listView": "列表视图",
+    "shared": "共享给我的",
+    "noShared": "还没有共享给你的技能",
+    "noSharedHint": "资源所有者把你加为协作者后，会出现在这里"
   },
   "auth": {
     "login": "登录",
@@ -711,5 +714,25 @@
         }
       }
     }
+  },
+  "invitations": {
+    "title": "企业邀请",
+    "accepting": "正在接受邀请…",
+    "accepted": "已加入企业",
+    "failed": "接受邀请失败",
+    "goSettings": "前往设置查看"
+  },
+  "registerAdmin": {
+    "title": "管理员注册",
+    "subtitle": "请使用邀请邮件中的邀请码完成注册",
+    "inviteCode": "邀请码",
+    "email": "邮箱（须与邀请邮箱一致）",
+    "username": "用户名",
+    "password": "密码",
+    "submit": "注册",
+    "submitting": "注册中…",
+    "failed": "注册失败，请检查邀请码与邮箱",
+    "hasAccount": "已有账号？",
+    "login": "去登录"
   }
 }

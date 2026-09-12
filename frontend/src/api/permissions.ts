@@ -29,7 +29,8 @@ export interface SkillPermissions {
 export interface PermissionAuditLog {
   _id: string;
   skillId: string;
-  action: 'create' | 'update' | 'delete' | 'add_collaborator' | 'remove_collaborator' | 'update_role';
+  action:
+    'create' | 'update' | 'delete' | 'add_collaborator' | 'remove_collaborator' | 'update_role';
   details: any;
   performedBy: string;
   performedAt: string;
@@ -63,12 +64,19 @@ export const permissionsApi = {
     return response.data.data;
   },
 
-  updatePermissions: async (skillId: string, data: UpdatePermissionsRequest): Promise<SkillPermissions> => {
+  updatePermissions: async (
+    skillId: string,
+    data: UpdatePermissionsRequest,
+  ): Promise<SkillPermissions> => {
     const response = await apiClient.put(`/skills/${skillId}/permissions`, data);
     return response.data.data;
   },
 
-  addCollaborator: async (skillId: string, userId: string, role?: 'viewer' | 'editor' | 'admin'): Promise<SkillPermissions> => {
+  addCollaborator: async (
+    skillId: string,
+    userId: string,
+    role?: 'viewer' | 'editor' | 'admin',
+  ): Promise<SkillPermissions> => {
     const response = await apiClient.post(`/skills/${skillId}/collaborators`, { userId, role });
     return response.data.data;
   },
@@ -76,7 +84,7 @@ export const permissionsApi = {
   updateCollaboratorRole: async (
     skillId: string,
     userId: string,
-    role: 'viewer' | 'editor' | 'admin'
+    role: 'viewer' | 'editor' | 'admin',
   ): Promise<SkillPermissions> => {
     const response = await apiClient.put(`/skills/${skillId}/collaborators/${userId}`, { role });
     return response.data.data;
@@ -91,10 +99,18 @@ export const permissionsApi = {
     return response.data.data;
   },
 
-  checkPermission: async (skillId: string, permission: 'view' | 'edit' | 'delete' | 'manage'): Promise<CheckPermissionResponse> => {
+  checkPermission: async (
+    skillId: string,
+    permission: 'view' | 'edit' | 'delete' | 'manage',
+  ): Promise<CheckPermissionResponse> => {
     const response = await apiClient.get(`/skills/${skillId}/permissions/check`, {
-      params: { permission }
+      params: { permission },
     });
     return response.data.data;
-  }
+  },
+};
+
+export const getSharedWithMe = async (): Promise<{ skills: SkillPermissions[] }> => {
+  const response = await apiClient.get('/shared-with-me');
+  return response.data;
 };

@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import { OAuthProvider } from '../models/OAuthProvider';
 import { OAuthSession } from '../models/OAuthSession';
 import { User } from '../models/User';
+import { Enterprise } from '../models/Enterprise';
 import { generateAccessToken } from '../utils/jwt';
 import axios from 'axios';
 import { createLogger } from '../utils/logger';
@@ -237,6 +238,21 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
     } else if (!user.enterpriseId && oauthProvider.enterpriseId) {
       user.enterpriseId = oauthProvider.enterpriseId;
       await user.save();
+
+      // Keep the roster consistent with the pointer (getMyEnterprise reads
+      // the members array; missing entries made it 404 for OAuth users).
+      await Enterprise.updateOne(
+        { _id: oauthProvider.enterpriseId, 'members.userId': { $ne: user._id } },
+        {
+          $push: {
+            members: {
+              userId: user._id as any,
+              role: 'member',
+              joinedAt: new Date(),
+            },
+          },
+        },
+      );
     }
 
     let oauthSession = await OAuthSession.findOne({
