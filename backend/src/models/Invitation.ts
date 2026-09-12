@@ -12,50 +12,58 @@ export interface IInvitation extends Document {
   updatedAt: Date;
 }
 
-const invitationSchema = new Schema<IInvitation>({
-  email: {
-    type: String,
-    required: true,
-    trim: true,
-    lowercase: true,
+const invitationSchema = new Schema<IInvitation>(
+  {
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+    },
+    enterpriseId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Enterprise',
+      required: true,
+    },
+    invitedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ['admin', 'member'],
+      required: true,
+      default: 'member',
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'declined', 'expired'],
+      default: 'pending',
+    },
+    token: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
   },
-  enterpriseId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Enterprise',
-    required: true,
+  {
+    timestamps: true,
   },
-  invitedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  role: {
-    type: String,
-    enum: ['admin', 'member'],
-    required: true,
-    default: 'member',
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'accepted', 'declined', 'expired'],
-    default: 'pending',
-  },
-  token: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  expiresAt: {
-    type: Date,
-    required: true,
-  },
-}, {
-  timestamps: true,
-});
+);
 
 invitationSchema.index({ email: 1, enterpriseId: 1 });
 invitationSchema.index({ enterpriseId: 1, status: 1 });
 invitationSchema.index({ token: 1 });
-invitationSchema.index({ expiresAt: 1 });
+// TTL: pending invitations are deleted once expired; processed ones are
+// kept as history (partial filter excludes them from the TTL).
+invitationSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0, partialFilterExpression: { status: 'pending' } },
+);
 
 export const Invitation = model<IInvitation>('Invitation', invitationSchema);

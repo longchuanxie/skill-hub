@@ -16,48 +16,51 @@ export interface IAdminInvitation extends Document {
   markAsExpired(): Promise<void>;
 }
 
-const adminInvitationSchema = new Schema<IAdminInvitation>({
-  email: {
-    type: String,
-    required: true,
-    trim: true,
-    lowercase: true,
-    maxlength: 100,
+const adminInvitationSchema = new Schema<IAdminInvitation>(
+  {
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      maxlength: 100,
+    },
+    inviteCode: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    inviterId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ['super_admin', 'admin', 'audit_admin'],
+      required: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+    usedAt: {
+      type: Date,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'used', 'expired'],
+      default: 'pending',
+    },
   },
-  inviteCode: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
+  {
+    timestamps: true,
   },
-  inviterId: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  role: {
-    type: String,
-    enum: ['super_admin', 'admin', 'audit_admin'],
-    required: true,
-  },
-  expiresAt: {
-    type: Date,
-    required: true,
-  },
-  usedAt: {
-    type: Date,
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'used', 'expired'],
-    default: 'pending',
-  },
-}, {
-  timestamps: true,
-});
+);
 
 // 生成邀请码
-adminInvitationSchema.pre('save', function(next) {
+adminInvitationSchema.pre('save', function (next) {
   if (!this.inviteCode) {
     this.inviteCode = crypto.randomBytes(32).toString('hex');
   }
@@ -65,26 +68,33 @@ adminInvitationSchema.pre('save', function(next) {
 });
 
 // 检查邀请是否过期
-adminInvitationSchema.methods.isExpired = function(): boolean {
+adminInvitationSchema.methods.isExpired = function (): boolean {
   return this.expiresAt < new Date();
 };
 
 // 检查邀请是否有效
-adminInvitationSchema.methods.isValid = function(): boolean {
+adminInvitationSchema.methods.isValid = function (): boolean {
   return this.status === 'pending' && !this.isExpired();
 };
 
 // 标记邀请为已使用
-adminInvitationSchema.methods.markAsUsed = async function(): Promise<void> {
+adminInvitationSchema.methods.markAsUsed = async function (): Promise<void> {
   this.status = 'used';
   this.usedAt = new Date();
   await this.save();
 };
 
 // 标记邀请为已过期
-adminInvitationSchema.methods.markAsExpired = async function(): Promise<void> {
+adminInvitationSchema.methods.markAsExpired = async function (): Promise<void> {
   this.status = 'expired';
   await this.save();
 };
+
+// TTL: pending admin invitations are deleted once expired; used/expired
+// ones stay as history.
+adminInvitationSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0, partialFilterExpression: { status: 'pending' } },
+);
 
 export const AdminInvitation = model<IAdminInvitation>('AdminInvitation', adminInvitationSchema);

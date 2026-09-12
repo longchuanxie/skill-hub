@@ -6,6 +6,7 @@ import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
 import { SkillVersion } from '../models/SkillVersion';
 import { ResourceVersion } from '../models/ResourceVersion';
+import { AuditLog } from '../models/AuditLog';
 
 // Regression tests for the batch-1 access-control hardening:
 // - version read endpoints require public/owner access
@@ -144,6 +145,32 @@ describe('Access control (batch 1)', () => {
         expect(user).not.toHaveProperty('twoFactorSecret');
         expect(user).not.toHaveProperty('loginHistory');
       }
+    });
+  });
+
+  describe('GET /api/admin/audit-logs', () => {
+    it('serves admins and rejects ordinary users', async () => {
+      await AuditLog.create({
+        action: 'user.status.update',
+        actor: admin._id,
+        targetType: 'user',
+        targetId: stranger._id,
+        details: { newStatus: 'disabled' },
+      });
+
+      await request(app)
+        .get('/api/admin/audit-logs')
+        .set('Authorization', `Bearer ${strangerToken}`)
+        .expect(403);
+
+      const res = await request(app)
+        .get('/api/admin/audit-logs')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(res.body.logs.length).toBeGreaterThan(0);
+      expect(res.body.logs[0].action).toBe('user.status.update');
+      expect(res.body.logs[0].actor?.username).toBe('admin1');
     });
   });
 

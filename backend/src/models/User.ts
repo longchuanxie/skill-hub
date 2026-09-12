@@ -17,11 +17,6 @@ export interface IUser extends Document {
   lockUntil?: Date;
   lastLoginAt?: Date;
   lastLoginIp?: string;
-  isTwoFactorEnabled: boolean;
-  twoFactorSecret?: string;
-  lastPasswordChange: Date;
-  passwordExpiresAt: Date;
-  loginHistory: LoginHistory[];
   adminPermissions?: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -29,13 +24,6 @@ export interface IUser extends Document {
   isLocked(): boolean;
   incLoginAttempts(): Promise<void>;
   resetLoginAttempts(): Promise<void>;
-}
-
-export interface LoginHistory {
-  ip: string;
-  userAgent: string;
-  loginAt: Date;
-  success: boolean;
 }
 
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -111,34 +99,6 @@ const userSchema = new Schema<IUser>(
     lastLoginIp: {
       type: String,
     },
-    isTwoFactorEnabled: {
-      type: Boolean,
-      default: false,
-    },
-    twoFactorSecret: {
-      type: String,
-      select: false,
-    },
-    lastPasswordChange: {
-      type: Date,
-      default: Date.now,
-    },
-    passwordExpiresAt: {
-      type: Date,
-      default: () => new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
-    },
-    loginHistory: {
-      select: false,
-      type: [
-        {
-          ip: String,
-          userAgent: String,
-          loginAt: Date,
-          success: Boolean,
-        },
-      ],
-      default: [],
-    },
     adminPermissions: {
       type: [String],
       default: [],
@@ -184,52 +144,6 @@ userSchema.pre('save', async function (next) {
 
 userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);
-};
-
-// 更新登录历史
-userSchema.methods.updateLoginHistory = async function (
-  ip: string,
-  userAgent: string,
-  success: boolean,
-): Promise<void> {
-  this.loginHistory.push({
-    ip,
-    userAgent,
-    loginAt: new Date(),
-    success,
-  });
-  // 只保留最近100条登录记录
-  if (this.loginHistory.length > 100) {
-    this.loginHistory = this.loginHistory.slice(-100);
-  }
-  await this.save();
-};
-
-// 检查密码是否过期
-userSchema.methods.isPasswordExpired = function (): boolean {
-  return this.passwordExpiresAt < new Date();
-};
-
-// 更新密码
-userSchema.methods.updatePassword = async function (newPassword: string): Promise<void> {
-  this.password = newPassword;
-  this.lastPasswordChange = new Date();
-  this.passwordExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
-  await this.save();
-};
-
-// 启用双重认证
-userSchema.methods.enableTwoFactor = async function (secret: string): Promise<void> {
-  this.isTwoFactorEnabled = true;
-  this.twoFactorSecret = secret;
-  await this.save();
-};
-
-// 禁用双重认证
-userSchema.methods.disableTwoFactor = async function (): Promise<void> {
-  this.isTwoFactorEnabled = false;
-  this.twoFactorSecret = undefined;
-  await this.save();
 };
 
 export const User = model<IUser>('User', userSchema);

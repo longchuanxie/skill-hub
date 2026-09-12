@@ -41,15 +41,15 @@ const AdminDashboardPage = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <Heading level={1}>{t('admin.dashboard.title')}</Heading>
-        <Text className="text-gray-600 mt-2">
-          {t('admin.dashboard.subtitle')}
-        </Text>
+        <Text className="text-gray-600 mt-2">{t('admin.dashboard.subtitle')}</Text>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">{t('admin.dashboard.totalUsers')}</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              {t('admin.dashboard.totalUsers')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats?.totalUsers || 0}</div>
@@ -61,7 +61,9 @@ const AdminDashboardPage = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">{t('admin.dashboard.totalEnterprises')}</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              {t('admin.dashboard.totalEnterprises')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats?.totalEnterprises || 0}</div>
@@ -73,7 +75,9 @@ const AdminDashboardPage = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">{t('admin.dashboard.totalSkills')}</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              {t('admin.dashboard.totalSkills')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats?.totalSkills || 0}</div>
@@ -82,7 +86,9 @@ const AdminDashboardPage = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">{t('admin.dashboard.totalPrompts')}</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              {t('admin.dashboard.totalPrompts')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats?.totalPrompts || 0}</div>
@@ -93,7 +99,9 @@ const AdminDashboardPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">{t('admin.dashboard.activeUsers')}</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              {t('admin.dashboard.activeUsers')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats?.activeUsersLast7Days || 0}</div>
@@ -102,7 +110,9 @@ const AdminDashboardPage = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">{t('admin.dashboard.pendingApprovals')}</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              {t('admin.dashboard.pendingApprovals')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-600">{stats?.pendingApprovals || 0}</div>
@@ -131,6 +141,18 @@ const AdminDashboardPage = () => {
             <CardContent>
               <Text className="text-gray-600">{t('admin.dashboard.enterpriseManagementDesc')}</Text>
               <Button className="mt-4">{t('admin.dashboard.goToEnterprises')}</Button>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/admin/audit-logs">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle>{t('admin.auditLogs.title')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Text className="text-gray-600">{t('admin.auditLogs.subtitle')}</Text>
+              <Button className="mt-4">{t('admin.auditLogs.goTo')}</Button>
             </CardContent>
           </Card>
         </Link>

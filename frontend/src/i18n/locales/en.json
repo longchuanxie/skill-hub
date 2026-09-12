@@ -713,6 +713,21 @@
           "member": "Member"
         }
       }
+    },
+    "auditLogs": {
+      "title": "Audit Logs",
+      "subtitle": "Complete audit trail of administrative actions",
+      "filterAction": "Filter by action (e.g. user.status.update)",
+      "loadFailed": "Failed to load audit logs",
+      "empty": "No audit records yet",
+      "time": "Time",
+      "action": "Action",
+      "actor": "Actor",
+      "target": "Target type",
+      "details": "Details",
+      "prev": "Previous",
+      "next": "Next",
+      "goTo": "View audit logs"
     }
   },
   "invitations": {

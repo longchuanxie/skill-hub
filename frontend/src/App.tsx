@@ -37,6 +37,7 @@ const CreateAgentPage = lazy(() => import('./pages/CreateAgentPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const AdminEnterprisesPage = lazy(() => import('./pages/AdminEnterprisesPage'));
+const AdminAuditLogsPage = lazy(() => import('./pages/AdminAuditLogsPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const RouteFallback = () => (
@@ -205,6 +206,16 @@ function App() {
                 <RoleRoute roles={['admin', 'super_admin']}>
                   <Layout>
                     <AdminEnterprisesPage />
+                  </Layout>
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/admin/audit-logs"
+              element={
+                <RoleRoute roles={['admin', 'super_admin', 'audit_admin']}>
+                  <Layout>
+                    <AdminAuditLogsPage />
                   </Layout>
                 </RoleRoute>
               }

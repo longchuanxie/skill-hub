@@ -42,6 +42,17 @@ export interface EnterpriseListItem {
   createdAt: string;
 }
 
+export interface AuditLogItem {
+  _id: string;
+  action: string;
+  actor?: { _id: string; username?: string; email?: string };
+  targetType?: string;
+  targetId?: string;
+  details?: Record<string, unknown>;
+  ip?: string;
+  createdAt: string;
+}
+
 export const adminApi = {
   getDashboardStats: async (): Promise<DashboardStats> => {
     const response = await apiClient.get('/admin/dashboard/stats');
@@ -85,11 +96,24 @@ export const adminApi = {
   updateEnterprisePlan: async (
     enterpriseId: string,
     plan: string,
-    expiresAt?: string
+    expiresAt?: string,
   ): Promise<void> => {
     await apiClient.put(`/admin/enterprises/${enterpriseId}/plan`, {
       plan,
       expiresAt,
     });
+  },
+
+  getAuditLogs: async (params?: {
+    page?: number;
+    pageSize?: number;
+    action?: string;
+    targetType?: string;
+  }): Promise<{
+    logs: AuditLogItem[];
+    pagination: { page: number; pages: number; total: number };
+  }> => {
+    const response = await apiClient.get('/admin/audit-logs', { params });
+    return response.data;
   },
 };

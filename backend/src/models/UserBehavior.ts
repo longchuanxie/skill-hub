@@ -9,38 +9,43 @@ export interface IUserBehavior extends Document {
   createdAt: Date;
 }
 
-const userBehaviorSchema = new Schema<IUserBehavior>({
-  userId: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
+const userBehaviorSchema = new Schema<IUserBehavior>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+    resourceType: {
+      type: String,
+      enum: ['skill', 'prompt'],
+      required: true,
+    },
+    resourceId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      index: true,
+    },
+    action: {
+      type: String,
+      enum: ['view', 'download', 'favorite', 'use'],
+      required: true,
+    },
+    metadata: {
+      type: Schema.Types.Mixed,
+    },
   },
-  resourceType: {
-    type: String,
-    enum: ['skill', 'prompt'],
-    required: true
+  {
+    timestamps: { createdAt: true, updatedAt: false },
   },
-  resourceId: {
-    type: Schema.Types.ObjectId,
-    required: true,
-    index: true
-  },
-  action: {
-    type: String,
-    enum: ['view', 'download', 'favorite', 'use'],
-    required: true
-  },
-  metadata: {
-    type: Schema.Types.Mixed
-  }
-}, {
-  timestamps: { createdAt: true, updatedAt: false }
-});
+);
 
 userBehaviorSchema.index({ userId: 1, createdAt: -1 });
 userBehaviorSchema.index({ resourceType: 1, resourceId: 1 });
 userBehaviorSchema.index({ action: 1 });
-userBehaviorSchema.index({ createdAt: -1 });
+// Behavior events feed recommendations and only recent ones matter -
+// cap retention at 90 days via TTL.
+userBehaviorSchema.index({ createdAt: -1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
 export const UserBehavior = model<IUserBehavior>('UserBehavior', userBehaviorSchema);
