@@ -13,8 +13,6 @@ import { getFileUrl } from '../middleware/upload';
 import { Types } from 'mongoose';
 import { ResourceVersion } from '../models/ResourceVersion';
 import { SkillPermissions } from '../models/SkillPermissions';
-import { TestCase } from '../models/TestCase';
-import { TestResult } from '../models/TestResult';
 import { Comment } from '../models/Comment';
 
 const logger = createLogger('SkillController');
@@ -717,8 +715,6 @@ export const deleteSkill = async (req: AuthRequest, res: Response): Promise<void
       SkillVersion.deleteMany({ skillId: skill._id }),
       ResourceVersion.deleteMany({ resourceId: skill._id, resourceType: 'skill' }),
       SkillPermissions.findOneAndDelete({ skillId: skill._id }),
-      TestCase.deleteMany({ skillId: skill._id }),
-      TestResult.deleteMany({ skillId: skill._id }),
       Comment.deleteMany({ resourceId: skill._id }),
     ]);
     await skill.deleteOne();

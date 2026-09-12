@@ -21,7 +21,6 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const UploadPage = lazy(() => import('./pages/UploadPage'));
 const SkillDetailPage = lazy(() => import('./pages/SkillDetailPage'));
 const SkillEditPage = lazy(() => import('./pages/SkillEditPage'));
-const SkillOnlineTestPage = lazy(() => import('./pages/SkillOnlineTestPage'));
 const SkillPermissionsPage = lazy(() => import('./pages/SkillPermissionsPage'));
 const SkillVersionHistoryPage = lazy(() => import('./pages/SkillVersionHistoryPage'));
 const SkillPreviewPage = lazy(() => import('./pages/SkillPreviewPage'));
@@ -88,14 +87,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SkillEditPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/skills/:id/test"
-              element={
-                <ProtectedRoute>
-                  <SkillOnlineTestPage />
                 </ProtectedRoute>
               }
             />
