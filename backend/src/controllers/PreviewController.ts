@@ -32,16 +32,16 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const hasAccess = 
-      skill.visibility === 'public' || 
-      String(skill.owner) === req.user?.userId;
+    const hasAccess = skill.visibility === 'public' || String(skill.owner) === req.user?.userId;
 
     if (!hasAccess) {
       res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
       return;
     }
 
-    const latestVersion = await SkillVersion.findOne({ skillId: skill._id }).sort({ createdAt: -1 });
+    const latestVersion = await SkillVersion.findOne({ skillId: skill._id }).sort({
+      createdAt: -1,
+    });
     if (!latestVersion || !latestVersion.url) {
       res.status(400).json(createErrorResponse(ErrorCode.NO_FILE_AVAILABLE));
       return;
@@ -56,7 +56,7 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
     // Check file tree cache first
     const fileTreeCacheKey = generateCacheKey(zipPath, 'filetree');
     const cachedFileTree = cache.get(fileTreeCacheKey);
-    
+
     if (cachedFileTree && cachedFileTree.data) {
       res.json({ fileTree: cachedFileTree.data });
       return;
@@ -67,11 +67,11 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
 
     try {
       const fileTree = buildFileTree(extractedDir);
-      
+
       // Cache the file tree
-      cache.set(fileTreeCacheKey, { 
-        filePath: '', 
-        data: fileTree 
+      cache.set(fileTreeCacheKey, {
+        filePath: '',
+        data: fileTree,
       });
 
       res.json({ fileTree });
@@ -87,7 +87,7 @@ export const getSkillFileTree = async (req: AuthRequest, res: Response): Promise
 export const previewSkillFile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const skillId = req.params.id;
-    const filePath = req.query.path as string || '';
+    const filePath = (req.query.path as string) || '';
 
     if (!skillId) {
       res.status(400).json(createErrorResponse(ErrorCode.MISSING_REQUIRED_FIELD));
@@ -100,16 +100,16 @@ export const previewSkillFile = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const hasAccess = 
-      skill.visibility === 'public' || 
-      String(skill.owner) === req.user?.userId;
+    const hasAccess = skill.visibility === 'public' || String(skill.owner) === req.user?.userId;
 
     if (!hasAccess) {
       res.status(403).json(createErrorResponse(ErrorCode.ACCESS_DENIED));
       return;
     }
 
-    const latestVersion = await SkillVersion.findOne({ skillId: skill._id }).sort({ createdAt: -1 });
+    const latestVersion = await SkillVersion.findOne({ skillId: skill._id }).sort({
+      createdAt: -1,
+    });
     if (!latestVersion || !latestVersion.url) {
       res.status(400).json(createErrorResponse(ErrorCode.NO_FILE_AVAILABLE));
       return;
@@ -173,7 +173,7 @@ function buildFileTree(dirPath: string, basePath: string = '', depth: number = 0
 
   const items = fs.readdirSync(dirPath);
   const tree: FileTreeNode[] = [];
-  
+
   // 限制处理文件数量，防止超大目录导致性能问题
   const limitedItems = items.slice(0, MAX_FILES_PER_DIR);
 
@@ -245,7 +245,18 @@ function getMimeType(filePath: string): string {
 
 function isBinaryFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
-  const binaryExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.pdf', '.zip', '.exe', '.dll', '.bin'];
+  const binaryExtensions = [
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.svg',
+    '.pdf',
+    '.zip',
+    '.exe',
+    '.dll',
+    '.bin',
+  ];
   return binaryExtensions.includes(ext);
 }
 
@@ -261,25 +272,58 @@ function generateCacheKey(zipPath: string, prefix: string = ''): string {
 /**
  * Extract ZIP file to cache or use cached version
  */
+const EXTRACTED_DIR = path.join(process.cwd(), 'temp', 'extracted');
+const EXTRACT_TTL_MS = 30 * 60 * 1000; // keep in sync with the cache TTL
+const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+let lastSweepAt = 0;
+
+// Extracted archives used to live forever: cache entries expire after 30
+// minutes but their directories were never removed. Sweep the extraction
+// dir for anything older than the TTL (throttled to once per interval).
+function sweepExtractedDirs(): void {
+  const now = Date.now();
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS) return;
+  lastSweepAt = now;
+
+  try {
+    if (!fs.existsSync(EXTRACTED_DIR)) return;
+    for (const entry of fs.readdirSync(EXTRACTED_DIR)) {
+      const dir = path.join(EXTRACTED_DIR, entry);
+      try {
+        const stats = fs.statSync(dir);
+        if (now - stats.mtimeMs > EXTRACT_TTL_MS) {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      } catch {
+        // unreadable entry - skip this sweep
+      }
+    }
+  } catch {
+    // sweeping must never break previewing
+  }
+}
+
 async function getOrExtractZip(zipPath: string): Promise<string> {
+  sweepExtractedDirs();
+
   const cacheKey = generateCacheKey(zipPath, 'zip');
   const cached = cache.get(cacheKey);
-  
+
   if (cached && fs.existsSync(cached.filePath)) {
     return cached.filePath;
   }
-  
+
   const tempDir = path.join(process.cwd(), 'temp', 'extracted', cacheKey);
   fs.mkdirSync(tempDir, { recursive: true });
-  
+
   await new Promise<void>((resolve, reject) => {
     fs.createReadStream(zipPath)
       .pipe(unzipper.Extract({ path: tempDir }))
       .on('close', resolve)
       .on('error', reject);
   });
-  
+
   cache.set(cacheKey, { filePath: tempDir });
-  
+
   return tempDir;
 }

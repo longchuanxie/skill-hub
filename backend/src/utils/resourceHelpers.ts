@@ -10,6 +10,17 @@ import { createLogger } from './logger';
 
 const logger = createLogger('resourceHelpers');
 
+// Monotonic per-resource counter. Parsing the semver string (the old
+// parseInt('1.10.0') -> 1100) produced wrong ordering and unique-index
+// collisions with e.g. '11.0.0'.
+export async function nextVersionNumber(resourceId: Types.ObjectId | string): Promise<number> {
+  const latest = await ResourceVersion.findOne({ resourceId })
+    .sort({ versionNumber: -1 })
+    .select('versionNumber')
+    .lean<{ versionNumber: number }>();
+  return (latest?.versionNumber ?? 0) + 1;
+}
+
 export interface ResourceStatusResult {
   status: 'draft' | 'pending' | 'approved';
   autoReviewResult?: { passed: boolean; issues?: string[] };
@@ -20,15 +31,16 @@ export async function determineResourceStatus(
   hasFile: boolean,
   isEnterpriseAgent: boolean,
   enterpriseId?: Types.ObjectId,
-  resourceData?: any
+  resourceData?: any,
 ): Promise<ResourceStatusResult> {
   if (!hasFile) {
     return { status: 'draft' };
   }
 
-  const reviewResult = resourceType === 'skill'
-    ? await reviewSkill(resourceData, resourceData?.filePath)
-    : await reviewPrompt(resourceData);
+  const reviewResult =
+    resourceType === 'skill'
+      ? await reviewSkill(resourceData, resourceData?.filePath)
+      : await reviewPrompt(resourceData);
 
   if (isEnterpriseAgent && enterpriseId) {
     if (reviewResult.passed) {
@@ -42,7 +54,7 @@ export async function determineResourceStatus(
 
   return {
     status: reviewResult.passed ? 'approved' : 'pending',
-    autoReviewResult: reviewResult
+    autoReviewResult: reviewResult,
   };
 }
 
@@ -89,7 +101,7 @@ export async function createResourceVersion(params: {
     resourceId: params.resourceId,
     resourceType: params.resourceType,
     version: params.version,
-    versionNumber: parseInt(params.version.split('.').join('')),
+    versionNumber: await nextVersionNumber(params.resourceId),
     content: params.content,
     files: params.files,
     changelog: params.changelog,

@@ -305,18 +305,36 @@ export const acceptInvitation = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    invitation.status = 'accepted';
-    await invitation.save();
+    // Idempotent join sequence (no multi-document transaction available):
+    // every step is safe to retry after a partial failure.
+    // 1. Add to the enterprise roster only if not already a member.
+    await Enterprise.updateOne(
+      { _id: enterprise._id, 'members.userId': { $ne: user._id } },
+      {
+        $push: {
+          members: {
+            userId: user._id as any,
+            role: invitation.role,
+            joinedAt: new Date(),
+          },
+        },
+      },
+    );
 
+    // 2. Leave any previous enterprise roster before switching.
+    if (user.enterpriseId && String(user.enterpriseId) !== String(enterprise._id)) {
+      await Enterprise.updateOne(
+        { _id: user.enterpriseId },
+        { $pull: { members: { userId: user._id } } },
+      );
+    }
+
+    // 3. Point the user at the new enterprise.
     user.enterpriseId = enterprise._id as any;
     await user.save();
 
-    enterprise.members.push({
-      userId: user._id as any,
-      role: invitation.role,
-      joinedAt: new Date(),
-    });
-    await enterprise.save();
+    // 4. Mark the invitation accepted only if still pending (replay-safe).
+    await Invitation.updateOne({ _id: invitation._id, status: 'pending' }, { status: 'accepted' });
 
     await AuditLog.create({
       action: 'accept_invitation',

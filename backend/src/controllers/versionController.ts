@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import AdmZip from 'adm-zip';
 import { createLogger } from '../utils/logger';
+import { nextVersionNumber } from '../utils/resourceHelpers';
 
 const logger = createLogger('versionController');
 
@@ -166,9 +167,7 @@ export const createVersion = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const existingVersions = await ResourceVersion.find({ resourceId }).sort({ versionNumber: -1 });
-    const latestVersion = existingVersions[0];
-    const newVersionNumber = latestVersion ? latestVersion.versionNumber + 1 : 1;
+    const newVersionNumber = await nextVersionNumber(String(resourceId));
 
     const newVersion = new ResourceVersion({
       resourceId,

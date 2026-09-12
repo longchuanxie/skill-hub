@@ -7,6 +7,7 @@ import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
 import { Types } from 'mongoose';
 import { reviewPrompt } from '../utils/resourceAutoReview';
+import { Comment } from '../models/Comment';
 
 const logger = createLogger('PromptController');
 
@@ -432,7 +433,11 @@ export const deletePrompt = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    await PromptVersion.deleteMany({ promptId: prompt._id });
+    await Promise.all([
+      PromptVersion.deleteMany({ promptId: prompt._id }),
+      ResourceVersion.deleteMany({ resourceId: prompt._id, resourceType: 'prompt' }),
+      Comment.deleteMany({ resourceId: prompt._id }),
+    ]);
     await prompt.deleteOne();
     res.json({ message: 'Prompt deleted' });
   } catch (error) {

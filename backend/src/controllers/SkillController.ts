@@ -11,8 +11,26 @@ import { ErrorCode, createErrorResponse } from '../utils/errors';
 import { createResourceVersion } from '../utils/resourceHelpers';
 import { getFileUrl } from '../middleware/upload';
 import { Types } from 'mongoose';
+import { ResourceVersion } from '../models/ResourceVersion';
+import { SkillPermissions } from '../models/SkillPermissions';
+import { TestCase } from '../models/TestCase';
+import { TestResult } from '../models/TestResult';
+import { Comment } from '../models/Comment';
 
 const logger = createLogger('SkillController');
+
+// Remove a just-uploaded file from disk when the request fails after multer
+// already wrote it (validation errors, duplicate names, crashes) so uploads/
+// does not accumulate orphans.
+const unlinkUploadedFile = (req: AuthRequest): void => {
+  if (req.file?.path) {
+    try {
+      fs.rmSync(req.file.path, { force: true });
+    } catch {
+      // best-effort cleanup
+    }
+  }
+};
 
 export async function generateNextVersion(skillId: Types.ObjectId): Promise<string> {
   const versions = await SkillVersion.find({ skillId }).sort({ createdAt: -1 });
@@ -140,6 +158,7 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
         });
         const error = createErrorResponse(ErrorCode.INVALID_FILE_TYPE);
         res.status(error.statusCode).json(error);
+        unlinkUploadedFile(req);
         return;
       }
 
@@ -160,6 +179,7 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
             validationResult.errors,
           );
           res.status(error.statusCode).json(error);
+          unlinkUploadedFile(req);
           return;
         }
 
@@ -203,6 +223,7 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
       logger.warn('Create skill failed - name is required', { userId: req.user?.userId });
       const error = createErrorResponse(ErrorCode.NAME_REQUIRED);
       res.status(error.statusCode).json(error);
+      unlinkUploadedFile(req);
       return;
     }
 
@@ -364,6 +385,7 @@ export const createSkill = async (req: AuthRequest, res: Response): Promise<void
       stack: error instanceof Error ? error.stack : undefined,
       userId: req.user?.userId,
     });
+    unlinkUploadedFile(req);
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -508,6 +530,7 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
       if (!req.file!.originalname.endsWith('.zip')) {
         const error = createErrorResponse(ErrorCode.INVALID_FILE_TYPE);
         res.status(error.statusCode).json(error);
+        unlinkUploadedFile(req);
         return;
       }
 
@@ -522,6 +545,7 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
             validationResult.errors,
           );
           res.status(error.statusCode).json(error);
+          unlinkUploadedFile(req);
           return;
         }
 
@@ -646,6 +670,7 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
       });
       const error = createErrorResponse(ErrorCode.NAME_REQUIRED);
       res.status(error.statusCode).json(error);
+      unlinkUploadedFile(req);
       return;
     }
 
@@ -657,6 +682,7 @@ export const updateSkill = async (req: AuthRequest, res: Response): Promise<void
       stack: error instanceof Error ? error.stack : undefined,
       skillId: req.params.id,
     });
+    unlinkUploadedFile(req);
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -679,7 +705,33 @@ export const deleteSkill = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
+    // Cascade: versions, unified versions, permissions, tests, comments
+    // and the uploaded ZIPs must not outlive the skill.
+    const versions = await SkillVersion.find({ skillId: skill._id }).select('url').lean();
+    const filePaths = new Set<string>([
+      ...versions.map((v) => v.url).filter((u): u is string => !!u),
+      ...skill.files.map((f) => f.path).filter(Boolean),
+    ]);
+
+    await Promise.all([
+      SkillVersion.deleteMany({ skillId: skill._id }),
+      ResourceVersion.deleteMany({ resourceId: skill._id, resourceType: 'skill' }),
+      SkillPermissions.findOneAndDelete({ skillId: skill._id }),
+      TestCase.deleteMany({ skillId: skill._id }),
+      TestResult.deleteMany({ skillId: skill._id }),
+      Comment.deleteMany({ resourceId: skill._id }),
+    ]);
     await skill.deleteOne();
+
+    // Best-effort cleanup of the stored files.
+    for (const rel of filePaths) {
+      try {
+        fs.rmSync(path.join(process.cwd(), rel), { force: true });
+      } catch {
+        // file cleanup must never fail the delete
+      }
+    }
+
     res.json({ message: 'Skill deleted' });
   } catch (error) {
     logger.error('Delete skill failed', {
