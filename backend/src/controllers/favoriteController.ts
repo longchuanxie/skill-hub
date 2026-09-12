@@ -1,178 +1,191 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { Types } from 'mongoose';
 import { Skill } from '../models/Skill';
 import { Prompt } from '../models/Prompt';
+import { AuthRequest } from '../middleware/auth';
 import { createLogger } from '../utils/logger';
+import { ErrorCode, createErrorResponse } from '../utils/errors';
 
 const logger = createLogger('favoriteController');
 
+// All mutations use $addToSet/$pull + $inc so concurrent favorites cannot
+// overwrite each other (the old full-document save() lost updates).
+const hasFavorite = (favorites: Types.ObjectId[] | undefined, userId: string): boolean =>
+  !!favorites && favorites.some((u) => u.toString() === userId);
+
 export const favoriteController = {
-  addFavorite: async (req: Request, res: Response): Promise<void> => {
+  addFavorite: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { type, id } = req.params;
-      const userId = (req as any).user.id;
-
-      if (type === 'skill') {
-        const skill = await Skill.findById(id);
-        if (!skill) {
-          res.status(404).json({ message: 'Skill not found' });
-          return;
-        }
-
-        if (skill.favorites.includes(userId)) {
-          res.status(400).json({ message: 'Already favorited' });
-          return;
-        }
-
-        skill.favorites.push(userId);
-        skill.favoriteCount = skill.favorites.length;
-        await skill.save();
-
-        res.json({ 
-          message: 'Added to favorites',
-          favoriteCount: skill.favoriteCount 
-        });
-      } else if (type === 'prompt') {
-        const prompt = await Prompt.findById(id);
-        if (!prompt) {
-          res.status(404).json({ message: 'Prompt not found' });
-          return;
-        }
-
-        if (prompt.favorites.includes(userId)) {
-          res.status(400).json({ message: 'Already favorited' });
-          return;
-        }
-
-        prompt.favorites.push(userId);
-        prompt.favoriteCount = prompt.favorites.length;
-        await prompt.save();
-
-        res.json({ 
-          message: 'Added to favorites',
-          favoriteCount: prompt.favoriteCount 
-        });
-      } else {
-        res.status(400).json({ message: 'Invalid type' });
+      const userId = req.user?.userId;
+      if (!userId) {
+        const error = createErrorResponse(ErrorCode.TOKEN_MISSING);
+        res.status(error.statusCode).json(error);
+        return;
       }
+
+      const Model = type === 'skill' ? Skill : type === 'prompt' ? Prompt : null;
+      if (!Model) {
+        const error = createErrorResponse(ErrorCode.INVALID_INPUT);
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
+      const doc = await (Model as typeof Skill)
+        .findById(id)
+        .select('favorites favoriteCount')
+        .lean<{ favorites?: Types.ObjectId[]; favoriteCount: number }>();
+      if (!doc) {
+        const error = createErrorResponse(
+          type === 'skill' ? ErrorCode.SKILL_NOT_FOUND : ErrorCode.PROMPT_NOT_FOUND,
+        );
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
+      if (hasFavorite(doc.favorites, userId)) {
+        res.json({ message: 'Already favorited', favoriteCount: doc.favoriteCount ?? 0 });
+        return;
+      }
+
+      await (Model as typeof Skill).updateOne(
+        { _id: id },
+        { $addToSet: { favorites: userId }, $inc: { favoriteCount: 1 } },
+      );
+      res.json({ message: 'Added to favorites', favoriteCount: (doc.favoriteCount ?? 0) + 1 });
     } catch (error) {
-      logger.error('Add favorite error:', error);
-      res.status(500).json({ message: 'Server error' });
+      logger.error('Add favorite error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+      res.status(err.statusCode).json(err);
     }
   },
 
-  removeFavorite: async (req: Request, res: Response): Promise<void> => {
+  removeFavorite: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { type, id } = req.params;
-      const userId = (req as any).user.id;
-
-      if (type === 'skill') {
-        const skill = await Skill.findById(id);
-        if (!skill) {
-          res.status(404).json({ message: 'Skill not found' });
-          return;
-        }
-
-        if (!skill.favorites.includes(userId)) {
-          res.status(400).json({ message: 'Not favorited' });
-          return;
-        }
-
-        skill.favorites = skill.favorites.filter((id: any) => id.toString() !== userId);
-        skill.favoriteCount = skill.favorites.length;
-        await skill.save();
-
-        res.json({ 
-          message: 'Removed from favorites',
-          favoriteCount: skill.favoriteCount 
-        });
-      } else if (type === 'prompt') {
-        const prompt = await Prompt.findById(id);
-        if (!prompt) {
-          res.status(404).json({ message: 'Prompt not found' });
-          return;
-        }
-
-        if (!prompt.favorites.includes(userId)) {
-          res.status(400).json({ message: 'Not favorited' });
-          return;
-        }
-
-        prompt.favorites = prompt.favorites.filter((id: any) => id.toString() !== userId);
-        prompt.favoriteCount = prompt.favorites.length;
-        await prompt.save();
-
-        res.json({ 
-          message: 'Removed from favorites',
-          favoriteCount: prompt.favoriteCount 
-        });
-      } else {
-        res.status(400).json({ message: 'Invalid type' });
+      const userId = req.user?.userId;
+      if (!userId) {
+        const error = createErrorResponse(ErrorCode.TOKEN_MISSING);
+        res.status(error.statusCode).json(error);
+        return;
       }
+
+      const Model = type === 'skill' ? Skill : type === 'prompt' ? Prompt : null;
+      if (!Model) {
+        const error = createErrorResponse(ErrorCode.INVALID_INPUT);
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
+      const doc = await (Model as typeof Skill)
+        .findById(id)
+        .select('favorites favoriteCount')
+        .lean<{ favorites?: Types.ObjectId[]; favoriteCount: number }>();
+      if (!doc) {
+        const error = createErrorResponse(
+          type === 'skill' ? ErrorCode.SKILL_NOT_FOUND : ErrorCode.PROMPT_NOT_FOUND,
+        );
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
+      if (!hasFavorite(doc.favorites, userId)) {
+        res.json({ message: 'Not favorited', favoriteCount: doc.favoriteCount ?? 0 });
+        return;
+      }
+
+      await (Model as typeof Skill).updateOne(
+        { _id: id },
+        { $pull: { favorites: userId }, $inc: { favoriteCount: -1 } },
+      );
+      res.json({
+        message: 'Removed from favorites',
+        favoriteCount: Math.max(0, (doc.favoriteCount ?? 0) - 1),
+      });
     } catch (error) {
-      logger.error('Remove favorite error:', error);
-      res.status(500).json({ message: 'Server error' });
+      logger.error('Remove favorite error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+      res.status(err.statusCode).json(err);
     }
   },
 
-  checkFavorite: async (req: Request, res: Response): Promise<void> => {
+  checkFavorite: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { type, id } = req.params;
-      const userId = (req as any).user.id;
-
-      if (type === 'skill') {
-        const skill = await Skill.findById(id);
-        if (!skill) {
-          res.status(404).json({ message: 'Skill not found' });
-          return;
-        }
-
-        const isFavorited = skill.favorites.includes(userId);
-        res.json({ isFavorited });
-      } else if (type === 'prompt') {
-        const prompt = await Prompt.findById(id);
-        if (!prompt) {
-          res.status(404).json({ message: 'Prompt not found' });
-          return;
-        }
-
-        const isFavorited = prompt.favorites.includes(userId);
-        res.json({ isFavorited });
-      } else {
-        res.status(400).json({ message: 'Invalid type' });
+      const userId = req.user?.userId;
+      if (!userId) {
+        const error = createErrorResponse(ErrorCode.TOKEN_MISSING);
+        res.status(error.statusCode).json(error);
+        return;
       }
+
+      const Model = type === 'skill' ? Skill : type === 'prompt' ? Prompt : null;
+      if (!Model) {
+        const error = createErrorResponse(ErrorCode.INVALID_INPUT);
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
+      const doc = await (Model as typeof Skill)
+        .findById(id)
+        .select('favorites')
+        .lean<{ favorites?: Types.ObjectId[] }>();
+      if (!doc) {
+        const error = createErrorResponse(
+          type === 'skill' ? ErrorCode.SKILL_NOT_FOUND : ErrorCode.PROMPT_NOT_FOUND,
+        );
+        res.status(error.statusCode).json(error);
+        return;
+      }
+
+      res.json({ isFavorited: hasFavorite(doc.favorites, userId) });
     } catch (error) {
-      logger.error('Check favorite error:', error);
-      res.status(500).json({ message: 'Server error' });
+      logger.error('Check favorite error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+      res.status(err.statusCode).json(err);
     }
   },
 
-  getFavorites: async (req: Request, res: Response) => {
+  getFavorites: async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { type } = req.params;
-      const userId = (req as any).user.id;
+      const userId = req.user?.userId;
+      if (!userId) {
+        const error = createErrorResponse(ErrorCode.TOKEN_MISSING);
+        res.status(error.statusCode).json(error);
+        return;
+      }
 
       if (type === 'skills') {
-        const skills = await Skill.find({ 
+        const skills = await Skill.find({
           favorites: userId,
           status: 'approved',
-          visibility: 'public'
+          visibility: 'public',
         }).populate('owner', 'username avatar');
-
         res.json({ skills });
       } else if (type === 'prompts') {
-        const prompts = await Prompt.find({ 
+        const prompts = await Prompt.find({
           favorites: userId,
           status: 'approved',
-          visibility: 'public'
+          visibility: 'public',
         }).populate('owner', 'username avatar');
-
         res.json({ prompts });
       } else {
-        res.status(400).json({ message: 'Invalid type' });
+        const error = createErrorResponse(ErrorCode.INVALID_INPUT);
+        res.status(error.statusCode).json(error);
       }
     } catch (error) {
-      logger.error('Get favorites error:', error);
-      res.status(500).json({ message: 'Server error' });
+      logger.error('Get favorites error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+      res.status(err.statusCode).json(err);
     }
-  }
+  },
 };

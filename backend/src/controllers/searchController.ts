@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
+import { User } from '../models/User';
 import { search, getSearchSuggestions } from '../services/searchService';
 import { createLogger } from '../utils/logger';
 import { ErrorCode, createErrorResponse } from '../utils/errors';
@@ -18,12 +19,22 @@ export const searchResources = async (req: AuthRequest, res: Response): Promise<
 
     logger.info('Searching resources', { query: q, type, category, page, limit, sort });
 
+    // Enterprise members also see their own enterprise's non-public items.
+    let enterpriseId: string | undefined;
+    if (req.user?.userId) {
+      const user = await User.findById(req.user.userId)
+        .select('enterpriseId')
+        .lean<{ enterpriseId?: unknown }>();
+      if (user?.enterpriseId) enterpriseId = user.enterpriseId.toString();
+    }
+
     const result = await search(q.trim(), {
       resourceType: type as 'skill' | 'prompt' | 'all',
       category: category as string,
       page: Number(page),
       limit: Number(limit),
       sort: sort as 'relevance' | 'latest' | 'popular',
+      enterpriseId,
     });
 
     logger.info('Search completed', {

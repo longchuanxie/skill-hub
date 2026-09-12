@@ -51,9 +51,10 @@ function calculateQualityScore(resource: any): number {
 async function getPopularSkills(options: RecommendationOptions): Promise<ResourceItem[]> {
   const { limit = 10, category, enterpriseId } = options;
 
+  // Public-only unless an enterprise scope is given; enterprise/shared
+  // resources are limited to that enterprise.
   const query: any = {
     status: 'approved',
-    visibility: { $in: ['public', 'enterprise', 'shared'] }
   };
 
   if (category) {
@@ -63,8 +64,10 @@ async function getPopularSkills(options: RecommendationOptions): Promise<Resourc
   if (enterpriseId) {
     query.$or = [
       { visibility: 'public' },
-      { enterpriseId }
+      { visibility: { $in: ['enterprise', 'shared'] }, enterpriseId },
     ];
+  } else {
+    query.visibility = 'public';
   }
 
   const skills = await Skill.find(query)
@@ -72,15 +75,15 @@ async function getPopularSkills(options: RecommendationOptions): Promise<Resourc
     .limit(limit * 2)
     .lean();
 
-  const scored = skills.map(skill => ({
+  const scored = skills.map((skill) => ({
     ...skill,
-    qualityScore: calculateQualityScore(skill)
+    qualityScore: calculateQualityScore(skill),
   }));
 
   return scored
     .sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0))
     .slice(0, limit)
-    .map(skill => ({
+    .map((skill) => ({
       _id: skill._id.toString(),
       name: skill.name || '',
       description: skill.description,
@@ -92,16 +95,17 @@ async function getPopularSkills(options: RecommendationOptions): Promise<Resourc
       downloads: skill.downloads || 0,
       usageCount: skill.usageCount || 0,
       createdAt: skill.createdAt,
-      qualityScore: skill.qualityScore
+      qualityScore: skill.qualityScore,
     }));
 }
 
 async function getPopularPrompts(options: RecommendationOptions): Promise<ResourceItem[]> {
   const { limit = 10, category, enterpriseId } = options;
 
+  // Public-only unless an enterprise scope is given; enterprise/shared
+  // resources are limited to that enterprise.
   const query: any = {
     status: 'approved',
-    visibility: { $in: ['public', 'enterprise', 'shared'] }
   };
 
   if (category) {
@@ -111,8 +115,10 @@ async function getPopularPrompts(options: RecommendationOptions): Promise<Resour
   if (enterpriseId) {
     query.$or = [
       { visibility: 'public' },
-      { enterpriseId }
+      { visibility: { $in: ['enterprise', 'shared'] }, enterpriseId },
     ];
+  } else {
+    query.visibility = 'public';
   }
 
   const prompts = await Prompt.find(query)
@@ -120,15 +126,15 @@ async function getPopularPrompts(options: RecommendationOptions): Promise<Resour
     .limit(limit * 2)
     .lean();
 
-  const scored = prompts.map(prompt => ({
+  const scored = prompts.map((prompt) => ({
     ...prompt,
-    qualityScore: calculateQualityScore(prompt)
+    qualityScore: calculateQualityScore(prompt),
   }));
 
   return scored
     .sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0))
     .slice(0, limit)
-    .map(prompt => ({
+    .map((prompt) => ({
       _id: prompt._id.toString(),
       name: prompt.name,
       description: prompt.description,
@@ -140,7 +146,7 @@ async function getPopularPrompts(options: RecommendationOptions): Promise<Resour
       downloads: 0,
       usageCount: prompt.usageCount || 0,
       createdAt: prompt.createdAt,
-      qualityScore: prompt.qualityScore
+      qualityScore: prompt.qualityScore,
     }));
 }
 
@@ -149,8 +155,7 @@ async function getNewResources(options: RecommendationOptions): Promise<Resource
 
   const query: any = {
     status: 'approved',
-    visibility: { $in: ['public', 'enterprise', 'shared'] },
-    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
   };
 
   if (category) {
@@ -160,16 +165,15 @@ async function getNewResources(options: RecommendationOptions): Promise<Resource
   if (enterpriseId) {
     query.$or = [
       { visibility: 'public' },
-      { enterpriseId }
+      { visibility: { $in: ['enterprise', 'shared'] }, enterpriseId },
     ];
+  } else {
+    query.visibility = 'public';
   }
 
   if (resourceType === 'skill' || resourceType === 'prompt') {
     const model: any = resourceType === 'skill' ? Skill : Prompt;
-    const resources = await model.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
+    const resources = await model.find(query).sort({ createdAt: -1 }).limit(limit).lean();
 
     return resources.map((resource: any) => ({
       _id: resource._id.toString(),
@@ -182,7 +186,7 @@ async function getNewResources(options: RecommendationOptions): Promise<Resource
       likeCount: resource.likeCount || 0,
       downloads: resource.downloads || (resource as any).downloads || 0,
       usageCount: (resource as any).usageCount || 0,
-      createdAt: resource.createdAt
+      createdAt: resource.createdAt,
     }));
   }
 
@@ -200,20 +204,22 @@ async function getSimilarSkills(resourceId: string, limit: number = 10): Promise
     _id: { $ne: new Types.ObjectId(resourceId) },
     status: 'approved',
     visibility: { $in: ['public', 'enterprise', 'shared'] },
-    category: skill.category
-  }).limit(50).lean();
+    category: skill.category,
+  })
+    .limit(50)
+    .lean();
 
   const targetTags = new Set(skill.tags || []);
-  const scored = candidates.map(candidate => {
+  const scored = candidates.map((candidate) => {
     const candidateTags = new Set(candidate.tags || []);
-    const intersection = [...targetTags].filter(t => candidateTags.has(t));
+    const intersection = [...targetTags].filter((t) => candidateTags.has(t));
     const union = new Set([...targetTags, ...candidateTags]);
     const similarity = union.size > 0 ? intersection.length / union.size : 0;
 
     return {
       ...candidate,
       similarity,
-      qualityScore: calculateQualityScore(candidate)
+      qualityScore: calculateQualityScore(candidate),
     };
   });
 
@@ -224,7 +230,7 @@ async function getSimilarSkills(resourceId: string, limit: number = 10): Promise
       return (b.qualityScore || 0) - (a.qualityScore || 0);
     })
     .slice(0, limit)
-    .map(candidate => ({
+    .map((candidate) => ({
       _id: candidate._id.toString(),
       name: candidate.name || '',
       description: candidate.description,
@@ -237,7 +243,7 @@ async function getSimilarSkills(resourceId: string, limit: number = 10): Promise
       usageCount: candidate.usageCount || 0,
       createdAt: candidate.createdAt,
       similarity: candidate.similarity,
-      qualityScore: candidate.qualityScore
+      qualityScore: candidate.qualityScore,
     }));
 }
 
@@ -252,20 +258,22 @@ async function getSimilarPrompts(resourceId: string, limit: number = 10): Promis
     _id: { $ne: new Types.ObjectId(resourceId) },
     status: 'approved',
     visibility: { $in: ['public', 'enterprise', 'shared'] },
-    category: prompt.category
-  }).limit(50).lean();
+    category: prompt.category,
+  })
+    .limit(50)
+    .lean();
 
   const targetTags = new Set(prompt.tags || []);
-  const scored = candidates.map(candidate => {
+  const scored = candidates.map((candidate) => {
     const candidateTags = new Set(candidate.tags || []);
-    const intersection = [...targetTags].filter(t => candidateTags.has(t));
+    const intersection = [...targetTags].filter((t) => candidateTags.has(t));
     const union = new Set([...targetTags, ...candidateTags]);
     const similarity = union.size > 0 ? intersection.length / union.size : 0;
 
     return {
       ...candidate,
       similarity,
-      qualityScore: calculateQualityScore(candidate)
+      qualityScore: calculateQualityScore(candidate),
     };
   });
 
@@ -276,7 +284,7 @@ async function getSimilarPrompts(resourceId: string, limit: number = 10): Promis
       return (b.qualityScore || 0) - (a.qualityScore || 0);
     })
     .slice(0, limit)
-    .map(candidate => ({
+    .map((candidate) => ({
       _id: candidate._id.toString(),
       name: candidate.name,
       description: candidate.description,
@@ -289,7 +297,7 @@ async function getSimilarPrompts(resourceId: string, limit: number = 10): Promis
       usageCount: candidate.usageCount || 0,
       createdAt: candidate.createdAt,
       similarity: candidate.similarity,
-      qualityScore: candidate.qualityScore
+      qualityScore: candidate.qualityScore,
     }));
 }
 
@@ -302,7 +310,7 @@ async function getPersonalizedResources(options: RecommendationOptions): Promise
 
   const userBehaviors = await UserBehavior.find({
     userId: new Types.ObjectId(userId),
-    resourceType
+    resourceType,
   })
     .sort({ createdAt: -1 })
     .limit(100)
@@ -312,11 +320,13 @@ async function getPersonalizedResources(options: RecommendationOptions): Promise
     return getPopularResources(options);
   }
 
-  const resourceIds = userBehaviors.map(b => b.resourceId);
+  const resourceIds = userBehaviors.map((b) => b.resourceId);
   const viewedModel: any = resourceType === 'skill' ? Skill : Prompt;
-  const viewedResources = await viewedModel.find({
-    _id: { $in: resourceIds }
-  }).lean();
+  const viewedResources = await viewedModel
+    .find({
+      _id: { $in: resourceIds },
+    })
+    .lean();
 
   const tagFrequency: Map<string, number> = new Map();
   const categoryCounts: Map<string, number> = new Map();
@@ -334,13 +344,13 @@ async function getPersonalizedResources(options: RecommendationOptions): Promise
     .slice(0, 5)
     .map(([tag]) => tag);
 
-  const mainCategory = [...categoryCounts.entries()]
-    .sort((a, b) => b[1] - a[1])[0]?.[0] || 'general';
+  const mainCategory =
+    [...categoryCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || 'general';
 
   const query: any = {
     _id: { $nin: resourceIds },
     status: 'approved',
-    visibility: { $in: ['public', 'enterprise', 'shared'] }
+    visibility: { $in: ['public', 'enterprise', 'shared'] },
   };
 
   if (category) {
@@ -350,21 +360,19 @@ async function getPersonalizedResources(options: RecommendationOptions): Promise
   }
 
   if (enterpriseId) {
-    query.$or = [
-      { visibility: 'public' },
-      { enterpriseId }
-    ];
+    query.$or = [{ visibility: 'public' }, { enterpriseId }];
   }
 
   const model: any = resourceType === 'skill' ? Skill : Prompt;
-  const candidates = await model.find(query)
+  const candidates = await model
+    .find(query)
     .limit(limit * 3)
     .lean();
 
   const scored = candidates.map((candidate: any) => {
     const candidateTags = new Set(candidate.tags || []);
     let tagScore = 0;
-    topTags.forEach(tag => {
+    topTags.forEach((tag) => {
       if (candidateTags.has(tag)) {
         tagScore += 1;
       }
@@ -374,7 +382,7 @@ async function getPersonalizedResources(options: RecommendationOptions): Promise
     return {
       ...candidate,
       personalizedScore: tagScore / Math.max(topTags.length, 1) + categoryBonus,
-      qualityScore: calculateQualityScore(candidate)
+      qualityScore: calculateQualityScore(candidate),
     };
   });
 
@@ -397,7 +405,7 @@ async function getPersonalizedResources(options: RecommendationOptions): Promise
       downloads: candidate.downloads || 0,
       usageCount: candidate.usageCount || 0,
       createdAt: candidate.createdAt,
-      qualityScore: candidate.qualityScore
+      qualityScore: candidate.qualityScore,
     }));
 }
 
@@ -412,14 +420,22 @@ async function getPopularResources(options: RecommendationOptions): Promise<Reso
 
   const [skills, prompts] = await Promise.all([
     getPopularSkills({ ...options, limit: Math.ceil((options.limit || 10) / 2) }),
-    getPopularPrompts({ ...options, limit: Math.floor((options.limit || 10) / 2) })
+    getPopularPrompts({ ...options, limit: Math.floor((options.limit || 10) / 2) }),
   ]);
 
   return [...skills, ...prompts].sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
 }
 
 export async function getRecommendations(options: RecommendationOptions): Promise<ResourceItem[]> {
-  const { type = 'popular', resourceType = 'skill', resourceId, limit = 10, userId, category, enterpriseId } = options;
+  const {
+    type = 'popular',
+    resourceType = 'skill',
+    resourceId,
+    limit = 10,
+    userId,
+    category,
+    enterpriseId,
+  } = options;
 
   const commonOptions = { type, limit, category, enterpriseId, userId, resourceType };
 
@@ -452,13 +468,13 @@ export async function recordBehavior(
   userId: string,
   resourceType: 'skill' | 'prompt',
   resourceId: string,
-  action: 'view' | 'download' | 'favorite' | 'use'
+  action: 'view' | 'download' | 'favorite' | 'use',
 ): Promise<void> {
   await UserBehavior.create({
     userId: new Types.ObjectId(userId),
     resourceType,
     resourceId: new Types.ObjectId(resourceId),
     action,
-    createdAt: new Date()
+    createdAt: new Date(),
   });
 }

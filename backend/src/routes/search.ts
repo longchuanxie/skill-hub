@@ -1,18 +1,18 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate, optionalAuth } from '../middleware/auth';
 import {
   searchResources,
   getSuggestions,
   logSearch,
   getSearchHistory,
-  clearSearchHistory
+  clearSearchHistory,
 } from '../controllers/searchController';
 
 const router = Router();
 
-router.get('/', searchResources);
+router.get('/', optionalAuth, searchResources);
 
-router.get('/suggestions', getSuggestions);
+router.get('/suggestions', optionalAuth, getSuggestions);
 
 router.post('/log', logSearch);
 

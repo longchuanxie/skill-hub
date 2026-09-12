@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { ResourceVersion } from '../models/ResourceVersion';
 import { Skill } from '../models/Skill';
@@ -11,33 +11,68 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('versionController');
 
-export const getVersions = async (req: Request, res: Response) => {
+// Read access for version data mirrors the market/detail rule: public
+// resources (rejected ones excluded) are readable by anyone, everything
+// else only by its owner.
+type ResourceDoc = { owner: { toString(): string }; visibility: string; status?: string };
+
+const checkReadAccess = (resource: ResourceDoc, userId?: string): boolean => {
+  if (userId && resource.owner.toString() === userId) return true;
+  return resource.visibility === 'public' && resource.status !== 'rejected';
+};
+
+const loadReadableResource = async (
+  resourceType: string,
+  resourceId: string,
+  userId?: string,
+): Promise<ResourceDoc | null | 'denied'> => {
+  const resource =
+    resourceType === 'skill'
+      ? await Skill.findById(resourceId)
+      : resourceType === 'prompt'
+        ? await Prompt.findById(resourceId)
+        : null;
+
+  if (!resource) return null;
+  if (!checkReadAccess(resource as unknown as ResourceDoc, userId)) return 'denied';
+  return resource as unknown as ResourceDoc;
+};
+
+export const getVersions = async (req: AuthRequest, res: Response) => {
   try {
     const { resourceId, resourceType } = req.params;
-    const { 
-      page = 1, 
-      pageSize = 10, 
-      sortBy = 'versionNumber', 
-      sortOrder = 'desc' 
-    } = req.query;
+    const { page = 1, pageSize = 10, sortBy = 'versionNumber', sortOrder = 'desc' } = req.query;
+
+    const access = await loadReadableResource(
+      String(resourceType),
+      String(resourceId),
+      req.user?.userId,
+    );
+    if (access === null) {
+      return res.status(404).json({ success: false, error: 'Resource not found' });
+    }
+    if (access === 'denied') {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
 
     const skip = (Number(page) - 1) * Number(pageSize);
-    
-    const sortField: string = sortBy === 'createdBy' ? 'createdBy' : sortBy === 'createdAt' ? 'createdAt' : 'versionNumber';
+
+    const sortField: string =
+      sortBy === 'createdBy' ? 'createdBy' : sortBy === 'createdAt' ? 'createdAt' : 'versionNumber';
     const sortDirection: 1 | -1 = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: any = {};
     sortOptions[sortField] = sortDirection;
 
     const [versions, total] = await Promise.all([
-      ResourceVersion.find({ 
+      ResourceVersion.find({
         resourceId,
-        resourceType 
+        resourceType,
       })
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(Number(pageSize))
-      .populate('createdBy', 'username'),
-      ResourceVersion.countDocuments({ resourceId, resourceType })
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(Number(pageSize))
+        .populate('createdBy', 'username'),
+      ResourceVersion.countDocuments({ resourceId, resourceType }),
     ]);
 
     res.json({
@@ -47,42 +82,54 @@ export const getVersions = async (req: Request, res: Response) => {
         pageSize: Number(pageSize),
         total,
         totalPages: Math.ceil(total / Number(pageSize)),
-      }
+      },
     });
   } catch (error) {
     logger.error('获取版本列表时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch versions'
+      error: 'Failed to fetch versions',
     });
   }
 };
 
-export const getVersion = async (req: Request, res: Response) => {
+export const getVersion = async (req: AuthRequest, res: Response) => {
   try {
-    const { resourceId, version } = req.params;
+    const { resourceId, resourceType, version } = req.params;
 
-    const versionData = await ResourceVersion.findOne({ 
+    const access = await loadReadableResource(
+      String(resourceType),
+      String(resourceId),
+      req.user?.userId,
+    );
+    if (access === null) {
+      return res.status(404).json({ success: false, error: 'Resource not found' });
+    }
+    if (access === 'denied') {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    const versionData = await ResourceVersion.findOne({
       resourceId,
-      version 
+      version,
     });
 
     if (!versionData) {
       return res.status(404).json({
         success: false,
-        error: 'Version not found'
+        error: 'Version not found',
       });
     }
 
     res.json({
       success: true,
-      data: versionData
+      data: versionData,
     });
   } catch (error) {
     logger.error('获取版本详情时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch version'
+      error: 'Failed to fetch version',
     });
   }
 };
@@ -96,25 +143,26 @@ export const createVersion = async (req: AuthRequest, res: Response) => {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
     }
 
-    const existingResource = resourceType === 'skill' 
-      ? await Skill.findById(resourceId)
-      : await Prompt.findById(resourceId);
+    const existingResource =
+      resourceType === 'skill'
+        ? await Skill.findById(resourceId)
+        : await Prompt.findById(resourceId);
 
     if (!existingResource) {
       return res.status(404).json({
         success: false,
-        error: 'Resource not found'
+        error: 'Resource not found',
       });
     }
 
     if (existingResource.owner.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized to create version'
+        error: 'Not authorized to create version',
       });
     }
 
@@ -131,7 +179,7 @@ export const createVersion = async (req: AuthRequest, res: Response) => {
       files,
       changelog,
       tags: tags || [],
-      createdBy: userId
+      createdBy: userId,
     });
 
     await newVersion.save();
@@ -144,13 +192,13 @@ export const createVersion = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json({
       success: true,
-      data: newVersion
+      data: newVersion,
     });
   } catch (error) {
     logger.error('创建版本时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to create version'
+      error: 'Failed to create version',
     });
   }
 };
@@ -163,61 +211,61 @@ export const rollbackVersion = async (req: AuthRequest, res: Response) => {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
     }
 
-    const targetVersion = await ResourceVersion.findOne({ 
+    const targetVersion = await ResourceVersion.findOne({
       resourceId,
-      version 
+      version,
     });
 
     if (!targetVersion) {
       return res.status(404).json({
         success: false,
-        error: 'Version not found'
+        error: 'Version not found',
       });
     }
 
-    const resource = await Skill.findById(resourceId) || await Prompt.findById(resourceId);
-    
+    const resource = (await Skill.findById(resourceId)) || (await Prompt.findById(resourceId));
+
     if (!resource) {
       return res.status(404).json({
         success: false,
-        error: 'Resource not found'
+        error: 'Resource not found',
       });
     }
 
     if (resource.owner.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized'
+        error: 'Not authorized',
       });
     }
 
     if (targetVersion.resourceType === 'skill') {
-      await Skill.findByIdAndUpdate(resourceId, { 
+      await Skill.findByIdAndUpdate(resourceId, {
         version: targetVersion.version,
         description: targetVersion.content,
-        files: targetVersion.files
+        files: targetVersion.files,
       });
     } else {
-      await Prompt.findByIdAndUpdate(resourceId, { 
+      await Prompt.findByIdAndUpdate(resourceId, {
         version: targetVersion.version,
         content: targetVersion.content,
-        files: targetVersion.files
+        files: targetVersion.files,
       });
     }
 
     res.json({
       success: true,
-      message: 'Rolled back successfully'
+      message: 'Rolled back successfully',
     });
   } catch (error) {
     logger.error('回滚版本时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to rollback version'
+      error: 'Failed to rollback version',
     });
   }
 };
@@ -231,35 +279,35 @@ export const addVersionTag = async (req: AuthRequest, res: Response) => {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
     }
 
-    const versionData = await ResourceVersion.findOne({ 
+    const versionData = await ResourceVersion.findOne({
       resourceId,
-      version 
+      version,
     });
 
     if (!versionData) {
       return res.status(404).json({
         success: false,
-        error: 'Version not found'
+        error: 'Version not found',
       });
     }
 
-    const resource = await Skill.findById(resourceId) || await Prompt.findById(resourceId);
-    
+    const resource = (await Skill.findById(resourceId)) || (await Prompt.findById(resourceId));
+
     if (!resource) {
       return res.status(404).json({
         success: false,
-        error: 'Resource not found'
+        error: 'Resource not found',
       });
     }
 
     if (resource.owner.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized'
+        error: 'Not authorized',
       });
     }
 
@@ -270,13 +318,13 @@ export const addVersionTag = async (req: AuthRequest, res: Response) => {
 
     res.json({
       success: true,
-      data: versionData
+      data: versionData,
     });
   } catch (error) {
     logger.error('添加版本标签时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to add tag'
+      error: 'Failed to add tag',
     });
   }
 };
@@ -289,83 +337,95 @@ export const deleteVersionTag = async (req: AuthRequest, res: Response) => {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: 'Unauthorized'
+        error: 'Unauthorized',
       });
     }
 
-    const versionData = await ResourceVersion.findOne({ 
+    const versionData = await ResourceVersion.findOne({
       resourceId,
-      version 
+      version,
     });
 
     if (!versionData) {
       return res.status(404).json({
         success: false,
-        error: 'Version not found'
+        error: 'Version not found',
       });
     }
 
-    const resource = await Skill.findById(resourceId) || await Prompt.findById(resourceId);
-    
+    const resource = (await Skill.findById(resourceId)) || (await Prompt.findById(resourceId));
+
     if (!resource) {
       return res.status(404).json({
         success: false,
-        error: 'Resource not found'
+        error: 'Resource not found',
       });
     }
 
     if (resource.owner.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized'
+        error: 'Not authorized',
       });
     }
 
-    versionData.tags = versionData.tags.filter(t => t !== tag);
+    versionData.tags = versionData.tags.filter((t) => t !== tag);
     await versionData.save();
 
     res.json({
       success: true,
-      data: versionData
+      data: versionData,
     });
   } catch (error) {
     logger.error('删除版本标签时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to delete tag'
+      error: 'Failed to delete tag',
     });
   }
 };
 
-export const compareVersions = async (req: Request, res: Response) => {
+export const compareVersions = async (req: AuthRequest, res: Response) => {
   try {
-    const { resourceId } = req.params;
+    const { resourceId, resourceType } = req.params;
     const { from, to } = req.query;
+
+    const access = await loadReadableResource(
+      String(resourceType),
+      String(resourceId),
+      req.user?.userId,
+    );
+    if (access === null) {
+      return res.status(404).json({ success: false, error: 'Resource not found' });
+    }
+    if (access === 'denied') {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
 
     const [fromVersion, toVersion] = await Promise.all([
       ResourceVersion.findOne({ resourceId, version: from }),
-      ResourceVersion.findOne({ resourceId, version: to })
+      ResourceVersion.findOne({ resourceId, version: to }),
     ]);
 
     if (!fromVersion || !toVersion) {
       return res.status(404).json({
         success: false,
-        error: 'One or both versions not found'
+        error: 'One or both versions not found',
       });
     }
 
     const changes: any[] = [];
     const summary = { added: 0, modified: 0, deleted: 0 };
 
-    const fromFiles = new Set(fromVersion.files.map(f => f.filename));
-    const toFiles = new Set(toVersion.files.map(f => f.filename));
+    const fromFiles = new Set(fromVersion.files.map((f) => f.filename));
+    const toFiles = new Set(toVersion.files.map((f) => f.filename));
 
     for (const file of fromVersion.files) {
       if (!toFiles.has(file.filename)) {
         changes.push({
           type: 'deleted',
           path: file.filename,
-          oldContent: file.path
+          oldContent: file.path,
         });
         summary.deleted++;
       }
@@ -376,17 +436,17 @@ export const compareVersions = async (req: Request, res: Response) => {
         changes.push({
           type: 'added',
           path: file.filename,
-          newContent: file.path
+          newContent: file.path,
         });
         summary.added++;
       } else {
-        const oldFile = fromVersion.files.find(f => f.filename === file.filename);
+        const oldFile = fromVersion.files.find((f) => f.filename === file.filename);
         if (oldFile?.path !== file.path || oldFile?.size !== file.size) {
           changes.push({
             type: 'modified',
             path: file.filename,
             oldContent: oldFile?.path,
-            newContent: file.path
+            newContent: file.path,
           });
           summary.modified++;
         }
@@ -399,14 +459,14 @@ export const compareVersions = async (req: Request, res: Response) => {
         fromVersion: fromVersion.version,
         toVersion: toVersion.version,
         changes,
-        summary
-      }
+        summary,
+      },
     });
   } catch (error) {
     logger.error('对比版本时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to compare versions'
+      error: 'Failed to compare versions',
     });
   }
 };
@@ -416,47 +476,45 @@ export const downloadVersion = async (req: AuthRequest, res: Response) => {
     const { resourceId, version } = req.params;
     const userId = req.user?.userId;
 
-    const versionData = await ResourceVersion.findOne({ 
+    const versionData = await ResourceVersion.findOne({
       resourceId,
-      version 
+      version,
     });
 
     if (!versionData) {
       return res.status(404).json({
         success: false,
-        error: 'Version not found'
+        error: 'Version not found',
       });
     }
 
-    const resource = await Skill.findById(resourceId) || await Prompt.findById(resourceId);
-    
+    const resource = (await Skill.findById(resourceId)) || (await Prompt.findById(resourceId));
+
     if (!resource) {
       return res.status(404).json({
         success: false,
-        error: 'Resource not found'
+        error: 'Resource not found',
       });
     }
 
-    const hasAccess =
-      resource.visibility === 'public' ||
-      (userId && resource.owner.toString() === userId);
+    const hasAccess = checkReadAccess(resource as unknown as ResourceDoc, userId);
 
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
-        error: 'Access denied'
+        error: 'Access denied',
       });
     }
 
     if (versionData.files.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'No files to download'
+        error: 'No files to download',
       });
     }
 
     const zip = new AdmZip();
-    
+
     for (const file of versionData.files) {
       const filePath = path.join(process.cwd(), file.path);
       if (fs.existsSync(filePath)) {
@@ -468,7 +526,7 @@ export const downloadVersion = async (req: AuthRequest, res: Response) => {
     const zipName = `${resource.name || 'resource'}-${version}.zip`;
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
-    
+
     zip.toBuffer((buffer) => {
       res.send(buffer);
     });
@@ -476,25 +534,37 @@ export const downloadVersion = async (req: AuthRequest, res: Response) => {
     logger.error('下载版本时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to download version'
+      error: 'Failed to download version',
     });
   }
 };
 
-export const compareVersionsDetailed = async (req: Request, res: Response) => {
+export const compareVersionsDetailed = async (req: AuthRequest, res: Response) => {
   try {
-    const { resourceId } = req.params;
+    const { resourceId, resourceType } = req.params;
     const { from, to, files } = req.query;
+
+    const access = await loadReadableResource(
+      String(resourceType),
+      String(resourceId),
+      req.user?.userId,
+    );
+    if (access === null) {
+      return res.status(404).json({ success: false, error: 'Resource not found' });
+    }
+    if (access === 'denied') {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
 
     const [fromVersion, toVersion] = await Promise.all([
       ResourceVersion.findOne({ resourceId, version: from }),
-      ResourceVersion.findOne({ resourceId, version: to })
+      ResourceVersion.findOne({ resourceId, version: to }),
     ]);
 
     if (!fromVersion || !toVersion) {
       return res.status(404).json({
         success: false,
-        error: 'One or both versions not found'
+        error: 'One or both versions not found',
       });
     }
 
@@ -504,7 +574,7 @@ export const compareVersionsDetailed = async (req: Request, res: Response) => {
     if (!fromZipPath || !toZipPath) {
       return res.status(400).json({
         success: false,
-        error: 'No zip files available for comparison'
+        error: 'No zip files available for comparison',
       });
     }
 
@@ -514,7 +584,7 @@ export const compareVersionsDetailed = async (req: Request, res: Response) => {
     if (!fs.existsSync(fullFromPath) || !fs.existsSync(fullToPath)) {
       return res.status(400).json({
         success: false,
-        error: 'Zip file not found'
+        error: 'Zip file not found',
       });
     }
 
@@ -544,27 +614,39 @@ export const compareVersionsDetailed = async (req: Request, res: Response) => {
         toVersion: toVersion.version,
         diff: diffResult,
         fileContents,
-      }
+      },
     });
   } catch (error) {
     logger.error('详细对比版本时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to compare versions in detail'
+      error: 'Failed to compare versions in detail',
     });
   }
 };
 
-export const getVersionFileContent = async (req: Request, res: Response) => {
+export const getVersionFileContent = async (req: AuthRequest, res: Response) => {
   try {
-    const { resourceId, version, filePath } = req.params;
+    const { resourceId, resourceType, version, filePath } = req.params;
     const { encoding = 'utf8' } = req.query;
+
+    const access = await loadReadableResource(
+      String(resourceType),
+      String(resourceId),
+      req.user?.userId,
+    );
+    if (access === null) {
+      return res.status(404).json({ success: false, error: 'Resource not found' });
+    }
+    if (access === 'denied') {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
 
     const versionData = await ResourceVersion.findOne({ resourceId, version });
     if (!versionData) {
       return res.status(404).json({
         success: false,
-        error: 'Version not found'
+        error: 'Version not found',
       });
     }
 
@@ -572,7 +654,7 @@ export const getVersionFileContent = async (req: Request, res: Response) => {
     if (!zipPath) {
       return res.status(400).json({
         success: false,
-        error: 'No zip file in this version'
+        error: 'No zip file in this version',
       });
     }
 
@@ -580,7 +662,7 @@ export const getVersionFileContent = async (req: Request, res: Response) => {
     if (!fs.existsSync(fullPath)) {
       return res.status(404).json({
         success: false,
-        error: 'Zip file not found'
+        error: 'Zip file not found',
       });
     }
 
@@ -589,7 +671,7 @@ export const getVersionFileContent = async (req: Request, res: Response) => {
     if (content === null) {
       return res.status(404).json({
         success: false,
-        error: 'File not found in zip'
+        error: 'File not found in zip',
       });
     }
 
@@ -599,13 +681,13 @@ export const getVersionFileContent = async (req: Request, res: Response) => {
         path: decodedFilePath,
         content,
         encoding,
-      }
+      },
     });
   } catch (error) {
     logger.error('获取版本文件内容时出错:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to get file content'
+      error: 'Failed to get file content',
     });
   }
 };

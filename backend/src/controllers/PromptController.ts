@@ -12,34 +12,48 @@ const logger = createLogger('PromptController');
 
 export async function generateNextVersion(promptId: Types.ObjectId): Promise<string> {
   const versions = await PromptVersion.find({ promptId }).sort({ createdAt: -1 });
-  
+
   if (versions.length === 0) {
     return '1.0.0';
   }
-  
+
   const lastVersion = versions[0].version;
   const parts = lastVersion.split('.').map(Number);
-  
+
   parts[2] = (parts[2] || 0) + 1;
-  
+
   if (parts[2] > 99) {
     parts[2] = 0;
     parts[1] = (parts[1] || 0) + 1;
   }
-  
+
   if (parts[1] > 99) {
     parts[1] = 0;
     parts[0] = (parts[0] || 0) + 1;
   }
-  
+
   return parts.join('.');
 }
 
 export const createPrompt = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    logger.info('Creating prompt', { userId: req.user?.userId, name: req.body.name, visibility: req.body.visibility });
-    
-    const { name, description, content, variables, category, tags, visibility, updateDescription, status } = req.body;
+    logger.info('Creating prompt', {
+      userId: req.user?.userId,
+      name: req.body.name,
+      visibility: req.body.visibility,
+    });
+
+    const {
+      name,
+      description,
+      content,
+      variables,
+      category,
+      tags,
+      visibility,
+      updateDescription,
+      status,
+    } = req.body;
 
     if (!req.user?.userId) {
       logger.warn('Create prompt failed - unauthorized', { ip: req.ip });
@@ -63,10 +77,10 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       } else {
         finalStatus = 'rejected';
       }
-      logger.info('Prompt auto review completed', { 
-        userId: req.user?.userId, 
-        passed: reviewResult.passed, 
-        status: finalStatus 
+      logger.info('Prompt auto review completed', {
+        userId: req.user?.userId,
+        passed: reviewResult.passed,
+        status: finalStatus,
       });
     } else {
       finalStatus = 'draft';
@@ -79,7 +93,9 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
 
     if (existingPrompt) {
       if (!updateDescription) {
-        logger.warn('Create prompt failed - update description required for new version', { userId: req.user?.userId });
+        logger.warn('Create prompt failed - update description required for new version', {
+          userId: req.user?.userId,
+        });
         const error = createErrorResponse(ErrorCode.UPDATE_DESCRIPTION_REQUIRED);
         res.status(error.statusCode).json(error);
         return;
@@ -103,7 +119,10 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
         updateDescription: updateDescription || `Update to version ${newVersion}`,
       });
       await promptVersion.save();
-      logger.debug('Prompt version created', { promptVersionId: promptVersion._id, version: newVersion });
+      logger.debug('Prompt version created', {
+        promptVersionId: promptVersion._id,
+        version: newVersion,
+      });
 
       const resourceVersion = new ResourceVersion({
         resourceId: existingPrompt._id,
@@ -118,7 +137,10 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
         createdBy: req.user!.userId,
       });
       await resourceVersion.save();
-      logger.debug('ResourceVersion created for prompt', { resourceVersionId: resourceVersion._id, version: newVersion });
+      logger.debug('ResourceVersion created for prompt', {
+        resourceVersionId: resourceVersion._id,
+        version: newVersion,
+      });
 
       existingPrompt.version = newVersion;
       if (content) existingPrompt.content = content;
@@ -186,10 +208,19 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       createdBy: req.user!.userId,
     });
     await resourceVersion.save();
-    logger.debug('ResourceVersion created for prompt', { resourceVersionId: resourceVersion._id, version: resourceVersion.version });
-    
-    logger.info('Prompt created successfully', { promptId: prompt._id, userId: req.user?.userId, name: prompt.name, visibility: prompt.visibility, status: prompt.status });
-    
+    logger.debug('ResourceVersion created for prompt', {
+      resourceVersionId: resourceVersion._id,
+      version: resourceVersion.version,
+    });
+
+    logger.info('Prompt created successfully', {
+      promptId: prompt._id,
+      userId: req.user?.userId,
+      name: prompt.name,
+      visibility: prompt.visibility,
+      status: prompt.status,
+    });
+
     res.status(201).json({
       message: 'Prompt created successfully',
       prompt,
@@ -197,7 +228,11 @@ export const createPrompt = async (req: AuthRequest, res: Response): Promise<voi
       autoReviewResult,
     });
   } catch (error) {
-    logger.error('Create prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, userId: req.user?.userId });
+    logger.error('Create prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.user?.userId,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -209,16 +244,13 @@ export const getPrompts = async (req: AuthRequest, res: Response): Promise<void>
     const skip = (Number(page) - 1) * Number(pageSize);
 
     let query: any = { visibility: 'public', status: 'approved' };
-    
+
     if (req.user?.userId) {
       query = {
-        $or: [
-          { visibility: 'public', status: 'approved' },
-          { owner: req.user.userId },
-        ]
+        $or: [{ visibility: 'public', status: 'approved' }, { owner: req.user.userId }],
       };
     }
-    
+
     if (category) query.category = category;
     if (search) query.$text = { $search: String(search) };
 
@@ -227,8 +259,12 @@ export const getPrompts = async (req: AuthRequest, res: Response): Promise<void>
     if (sort === 'rating') sortOption = { averageRating: -1 };
 
     const [prompts, total] = await Promise.all([
-      Prompt.find(query).populate('owner', 'username avatar').skip(skip).limit(Number(pageSize)).sort(sortOption),
-      Prompt.countDocuments(query)
+      Prompt.find(query)
+        .populate('owner', 'username avatar')
+        .skip(skip)
+        .limit(Number(pageSize))
+        .sort(sortOption),
+      Prompt.countDocuments(query),
     ]);
 
     res.json({
@@ -237,11 +273,14 @@ export const getPrompts = async (req: AuthRequest, res: Response): Promise<void>
         page: Number(page),
         pageSize: Number(pageSize),
         total,
-        pages: Math.ceil(total / Number(pageSize))
-      }
+        pages: Math.ceil(total / Number(pageSize)),
+      },
     });
   } catch (error) {
-    logger.error('Get prompts failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+    logger.error('Get prompts failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -251,7 +290,7 @@ export const getPromptById = async (req: AuthRequest, res: Response): Promise<vo
   try {
     const { id } = req.params;
     const prompt = await Prompt.findById(id).populate('owner', 'username avatar');
-    
+
     if (!prompt) {
       const error = createErrorResponse(ErrorCode.PROMPT_NOT_FOUND);
       res.status(error.statusCode).json(error);
@@ -259,9 +298,7 @@ export const getPromptById = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     const ownerId = (prompt.owner as any)._id || prompt.owner;
-    const hasAccess = 
-      prompt.visibility === 'public' || 
-      String(ownerId) === req.user?.userId;
+    const hasAccess = prompt.visibility === 'public' || String(ownerId) === req.user?.userId;
 
     if (!hasAccess) {
       const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
@@ -271,7 +308,11 @@ export const getPromptById = async (req: AuthRequest, res: Response): Promise<vo
 
     res.json(prompt);
   } catch (error) {
-    logger.error('Get prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Get prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -296,7 +337,10 @@ export const updatePrompt = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     if (!updateDescription) {
-      logger.warn('Update prompt failed - update description required', { userId: req.user?.userId, promptId: id });
+      logger.warn('Update prompt failed - update description required', {
+        userId: req.user?.userId,
+        promptId: id,
+      });
       const error = createErrorResponse(ErrorCode.UPDATE_DESCRIPTION_REQUIRED);
       res.status(error.statusCode).json(error);
       return;
@@ -304,8 +348,11 @@ export const updatePrompt = async (req: AuthRequest, res: Response): Promise<voi
 
     const newVersion = await generateNextVersion(prompt._id as Types.ObjectId);
     const hasContentChanges = updates.content !== undefined && updates.content !== prompt.content;
-    const hasDescriptionChanges = updates.description !== undefined && updates.description !== prompt.description;
-    const hasVariablesChanges = updates.variables !== undefined && JSON.stringify(updates.variables) !== JSON.stringify(prompt.variables);
+    const hasDescriptionChanges =
+      updates.description !== undefined && updates.description !== prompt.description;
+    const hasVariablesChanges =
+      updates.variables !== undefined &&
+      JSON.stringify(updates.variables) !== JSON.stringify(prompt.variables);
 
     if (hasContentChanges || hasDescriptionChanges || hasVariablesChanges) {
       const promptVersion = new PromptVersion({
@@ -328,12 +375,12 @@ export const updatePrompt = async (req: AuthRequest, res: Response): Promise<voi
     let autoReviewResult: { passed: boolean; issues?: string[]; warnings?: string[] } | undefined;
 
     if (status === 'approved' || status === 'pending') {
-      const reviewResult = await reviewPrompt({ 
-        name: prompt.name, 
-        description: prompt.description, 
-        content: prompt.content, 
-        category: prompt.category, 
-        tags: prompt.tags 
+      const reviewResult = await reviewPrompt({
+        name: prompt.name,
+        description: prompt.description,
+        content: prompt.content,
+        category: prompt.category,
+        tags: prompt.tags,
       });
       autoReviewResult = {
         passed: reviewResult.passed,
@@ -345,20 +392,24 @@ export const updatePrompt = async (req: AuthRequest, res: Response): Promise<voi
       } else {
         prompt.status = 'rejected';
       }
-      logger.info('Prompt update auto review completed', { 
+      logger.info('Prompt update auto review completed', {
         promptId: prompt._id,
-        userId: req.user?.userId, 
-        passed: reviewResult.passed, 
-        status: prompt.status 
+        userId: req.user?.userId,
+        passed: reviewResult.passed,
+        status: prompt.status,
       });
     } else if (status) {
       prompt.status = status;
     }
-    
+
     await prompt.save();
     res.json({ prompt, autoReviewResult });
   } catch (error) {
-    logger.error('Update prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Update prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -385,7 +436,11 @@ export const deletePrompt = async (req: AuthRequest, res: Response): Promise<voi
     await prompt.deleteOne();
     res.json({ message: 'Prompt deleted' });
   } catch (error) {
-    logger.error('Delete prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Delete prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -403,7 +458,7 @@ export const ratePrompt = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    const existingRating = prompt.ratings.find(r => String(r.userId) === req.user?.userId);
+    const existingRating = prompt.ratings.find((r) => String(r.userId) === req.user?.userId);
     if (existingRating) {
       existingRating.rating = rating;
     } else {
@@ -419,7 +474,11 @@ export const ratePrompt = async (req: AuthRequest, res: Response): Promise<void>
     await prompt.save();
     res.json({ message: 'Rating submitted', averageRating: prompt.averageRating });
   } catch (error) {
-    logger.error('Rate prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Rate prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -437,6 +496,17 @@ export const renderPrompt = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
+    // Rendering exposes the full prompt content - require the same read
+    // access as viewing the prompt itself.
+    const hasAccess =
+      (prompt.visibility === 'public' && prompt.status !== 'rejected') ||
+      String(prompt.owner) === req.user?.userId;
+    if (!hasAccess) {
+      const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
+      res.status(error.statusCode).json(error);
+      return;
+    }
+
     let result = prompt.content;
     for (const [key, value] of Object.entries(variables || {})) {
       const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
@@ -448,7 +518,11 @@ export const renderPrompt = async (req: AuthRequest, res: Response): Promise<voi
 
     res.json({ result });
   } catch (error) {
-    logger.error('Render prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Render prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -465,9 +539,7 @@ export const copyPrompt = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    const hasAccess =
-      prompt.visibility === 'public' ||
-      String(prompt.owner) === req.user?.userId;
+    const hasAccess = prompt.visibility === 'public' || String(prompt.owner) === req.user?.userId;
 
     if (!hasAccess) {
       const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
@@ -502,7 +574,11 @@ export const copyPrompt = async (req: AuthRequest, res: Response): Promise<void>
 
     res.json(copiedPrompt);
   } catch (error) {
-    logger.error('Copy prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Copy prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -530,7 +606,12 @@ export const getPromptVersions = async (req: AuthRequest, res: Response): Promis
 
     const total = await PromptVersion.countDocuments({ promptId });
 
-    logger.info('Prompt versions retrieved successfully', { promptId, count: versions.length, total, userId: req.user?.userId });
+    logger.info('Prompt versions retrieved successfully', {
+      promptId,
+      count: versions.length,
+      total,
+      userId: req.user?.userId,
+    });
 
     res.json({
       versions,
@@ -542,7 +623,11 @@ export const getPromptVersions = async (req: AuthRequest, res: Response): Promis
       },
     });
   } catch (error) {
-    logger.error('Get prompt versions failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Get prompt versions failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -594,7 +679,12 @@ export const rollbackPrompt = async (req: AuthRequest, res: Response): Promise<v
 
     await prompt.save();
 
-    logger.info('Prompt rolled back successfully', { promptId, version, newVersion, userId: req.user?.userId });
+    logger.info('Prompt rolled back successfully', {
+      promptId,
+      version,
+      newVersion,
+      userId: req.user?.userId,
+    });
 
     res.json({
       message: 'Prompt rolled back successfully',
@@ -602,7 +692,11 @@ export const rollbackPrompt = async (req: AuthRequest, res: Response): Promise<v
       rollbackVersion: newVersion,
     });
   } catch (error) {
-    logger.error('Rollback prompt failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Rollback prompt failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }
@@ -613,7 +707,12 @@ export const compareVersions = async (req: AuthRequest, res: Response): Promise<
     const { id: promptId } = req.params;
     const { version1, version2 } = req.query;
 
-    logger.debug('Comparing prompt versions', { promptId, version1, version2, userId: req.user?.userId });
+    logger.debug('Comparing prompt versions', {
+      promptId,
+      version1,
+      version2,
+      userId: req.user?.userId,
+    });
 
     const prompt = await Prompt.findById(promptId);
     if (!prompt) {
@@ -624,8 +723,7 @@ export const compareVersions = async (req: AuthRequest, res: Response): Promise<
 
     const ownerId = (prompt.owner as any)._id || prompt.owner;
     const hasAccess =
-      prompt.visibility === 'public' ||
-      (ownerId && String(ownerId) === req.user?.userId);
+      prompt.visibility === 'public' || (ownerId && String(ownerId) === req.user?.userId);
 
     if (!hasAccess) {
       const error = createErrorResponse(ErrorCode.ACCESS_DENIED);
@@ -642,14 +740,23 @@ export const compareVersions = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    logger.info('Prompt versions compared successfully', { promptId, version1, version2, userId: req.user?.userId });
+    logger.info('Prompt versions compared successfully', {
+      promptId,
+      version1,
+      version2,
+      userId: req.user?.userId,
+    });
 
     res.json({
       version1: v1,
       version2: v2,
     });
   } catch (error) {
-    logger.error('Compare prompt versions failed', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, promptId: req.params.id });
+    logger.error('Compare prompt versions failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      promptId: req.params.id,
+    });
     const err = createErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     res.status(err.statusCode).json(err);
   }

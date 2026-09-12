@@ -47,16 +47,16 @@ export async function searchSkills(
     limit = 20,
     sort = 'relevance',
     status = 'approved',
-    visibility = 'public',
     enterpriseId,
   } = options;
 
   const skip = (page - 1) * limit;
 
+  // Anonymous/public search only sees public resources; enterprise-scoped
+  // results additionally include enterprise/shared items of that enterprise.
   const searchQuery: any = {
     $text: { $search: query },
     status,
-    visibility: { $in: [visibility, 'enterprise', 'shared'] },
   };
 
   if (category) {
@@ -64,7 +64,12 @@ export async function searchSkills(
   }
 
   if (enterpriseId) {
-    searchQuery.$or = [{ visibility: 'public' }, { enterpriseId }];
+    searchQuery.$or = [
+      { visibility: 'public' },
+      { visibility: { $in: ['enterprise', 'shared'] }, enterpriseId },
+    ];
+  } else {
+    searchQuery.visibility = 'public';
   }
 
   let sortOption: any;
@@ -103,16 +108,16 @@ export async function searchPrompts(
     limit = 20,
     sort = 'relevance',
     status = 'approved',
-    visibility = 'public',
     enterpriseId,
   } = options;
 
   const skip = (page - 1) * limit;
 
+  // Anonymous/public search only sees public resources; enterprise-scoped
+  // results additionally include enterprise/shared items of that enterprise.
   const searchQuery: any = {
     $text: { $search: query },
     status,
-    visibility: { $in: [visibility, 'enterprise', 'shared'] },
   };
 
   if (category) {
@@ -120,7 +125,12 @@ export async function searchPrompts(
   }
 
   if (enterpriseId) {
-    searchQuery.$or = [{ visibility: 'public' }, { enterpriseId }];
+    searchQuery.$or = [
+      { visibility: 'public' },
+      { visibility: { $in: ['enterprise', 'shared'] }, enterpriseId },
+    ];
+  } else {
+    searchQuery.visibility = 'public';
   }
 
   let sortOption: any;

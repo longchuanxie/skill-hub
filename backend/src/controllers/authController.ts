@@ -114,7 +114,7 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     const { email, password } = req.body;
     const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
     if (!user) {
       logger.warn('Login failed - user not found', { email });
       const error = createErrorResponse(ErrorCode.INVALID_CREDENTIALS);
