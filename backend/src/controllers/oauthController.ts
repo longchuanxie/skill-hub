@@ -4,7 +4,8 @@ import { OAuthProvider } from '../models/OAuthProvider';
 import { OAuthSession } from '../models/OAuthSession';
 import { User } from '../models/User';
 import { Enterprise } from '../models/Enterprise';
-import { generateAccessToken } from '../utils/jwt';
+import { signOAuthState, verifyOAuthState } from '../utils/oauthState';
+import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 import axios from 'axios';
 import { createLogger } from '../utils/logger';
 
@@ -82,13 +83,12 @@ export const getAuthUrl = async (req: Request, res: Response): Promise<void> => 
       ? `${callbackBaseUrl}${oauthProvider.callbackPath}`
       : `${callbackBaseUrl}/api/oauth/callback/${provider}`;
 
-    const state = Buffer.from(
-      JSON.stringify({
-        providerId: oauthProvider._id,
-        redirectUri: callbackURL,
-        enterpriseId: oauthProvider.enterpriseId,
-      }),
-    ).toString('base64');
+    const state = signOAuthState({
+      providerId: String(oauthProvider._id),
+      redirectUri: callbackURL,
+      enterpriseId: oauthProvider.enterpriseId?.toString(),
+      action: 'login',
+    });
 
     if (isCustom) {
       const authUrl = new URL(oauthProvider.authorizationURL);
@@ -143,7 +143,14 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+    const stateData = verifyOAuthState(String(state));
+    if (!stateData) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid or expired state',
+      });
+      return;
+    }
     const { providerId, redirectUri } = stateData;
 
     const oauthProvider = await OAuthProvider.findById(providerId);
@@ -278,10 +285,18 @@ export const handleCallback = async (req: Request, res: Response): Promise<void>
       await oauthSession.save();
     }
 
+    // Tokens travel in the URL fragment: fragments are not sent to servers
+    // (no referrer/proxy/log leakage) unlike query strings. The refresh
+    // token is now issued too - OAuth logins previously could not refresh.
     const token = generateAccessToken(user as any);
+    const refreshToken = generateRefreshToken(user as any);
 
     res.redirect(
-      `${process.env.FRONTEND_URL || 'http://localhost:5173'}/oauth/callback?token=${token}`,
+      `${
+        process.env.FRONTEND_URL || 'http://localhost:5173'
+      }/oauth/callback#token=${encodeURIComponent(token)}&refreshToken=${encodeURIComponent(
+        refreshToken,
+      )}`,
     );
   } catch (error) {
     logger.error('OAuth回调处理时出错:', error);
@@ -359,15 +374,13 @@ export const linkAccount = async (req: AuthRequest, res: Response): Promise<void
       ? `${callbackBaseUrl}${oauthProvider.callbackPath}`
       : `${callbackBaseUrl}/api/oauth/callback/${provider}`;
 
-    const state = Buffer.from(
-      JSON.stringify({
-        providerId: oauthProvider._id,
-        redirectUri: callbackURL,
-        action: 'link',
-        userId,
-        enterpriseId: oauthProvider.enterpriseId,
-      }),
-    ).toString('base64');
+    const state = signOAuthState({
+      providerId: String(oauthProvider._id),
+      redirectUri: callbackURL,
+      action: 'link',
+      userId,
+      enterpriseId: oauthProvider.enterpriseId?.toString(),
+    });
 
     const authUrl = new URL(isCustom ? oauthProvider.authorizationURL : config!.authorizationURL);
     authUrl.searchParams.set('client_id', oauthProvider.clientId);

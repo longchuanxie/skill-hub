@@ -749,5 +749,9 @@
     "failed": "Registration failed - check the invite code and email",
     "hasAccount": "Already have an account?",
     "login": "Log in"
+  },
+  "oauth": {
+    "completing": "Completing authentication…",
+    "failed": "Sign-in failed, returning to login"
   }
 }

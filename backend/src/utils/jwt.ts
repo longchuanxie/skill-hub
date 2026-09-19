@@ -16,7 +16,7 @@ export type TokenType = 'access' | 'refresh' | 'email-verification' | 'password-
 
 const DEV_FALLBACK_SECRET = 'dev-insecure-secret';
 
-const getJwtSecret = (): string => {
+export const getJwtSecret = (): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     if (process.env.NODE_ENV === 'production') {
